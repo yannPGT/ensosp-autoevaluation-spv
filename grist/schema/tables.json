@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "tables": [
+    {"id":"Entites","columns":[["Code","Text"],["Nom","Text"],["Parent","Ref:Entites"],["Actif","Bool"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
+    {"id":"Perimetres","columns":[["Code","Text"],["Nom","Text"],["Entite","Ref:Entites"],["Actif","Bool"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
+    {"id":"Utilisateurs","columns":[["Email","Text"],["Nom","Text"],["Prenom","Text"],["Role","Choice"],["PeutGererPedagogie","Bool"],["Entite","Ref:Entites"],["PerimetrePrincipal","Ref:Perimetres"],["PerimetresSupervises","RefList:Perimetres"],["Actif","Bool"],["DateActivation","Date"],["DateDesactivation","Date"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
+    {"id":"AffectationsSuperviseurs","columns":[["Superviseur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["DateDebut","Date"],["DateFin","Date"],["Actif","Bool"],["CreatedAt","DateTime"],["CreatedByEmail","Text"]]},
+    {"id":"Axes","columns":[["Code","Text"],["Ordre","Int"],["Titre","Text"],["Description","Text"],["Actif","Bool"]]},
+    {"id":"Indicateurs","columns":[["Code","Text"],["Axe","Ref:Axes"],["Ordre","Int"],["Titre","Text"],["Description","Text"],["Obligatoire","Bool"],["Actif","Bool"]]},
+    {"id":"Criteres","columns":[["Indicateur","Ref:Indicateurs"],["Niveau","Choice"],["Ordre","Int"],["Libelle","Text"],["Actif","Bool"]]},
+    {"id":"ParametragesPerimetres","columns":[["Perimetre","Ref:Perimetres"],["Indicateur","Ref:Indicateurs"],["Actif","Bool"],["SuperviseurResponsable","Ref:Utilisateurs"],["UpdatedAt","DateTime"],["UpdatedByEmail","Text"]]},
+    {"id":"Campagnes","columns":[["Code","Text"],["Titre","Text"],["Perimetre","Ref:Perimetres"],["DateDebut","Date"],["DateFin","Date"],["Statut","Choice"],["CreatedAt","DateTime"],["CreatedByEmail","Text"]]},
+    {"id":"Evaluations","columns":[["Uid","Text"],["Recruteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["Campagne","Ref:Campagnes"],["Statut","Choice"],["DateDebut","DateTime"],["DateValidation","DateTime"],["ProgressionComplete","Int"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
+    {"id":"Reponses","columns":[["Uid","Text"],["Evaluation","Ref:Evaluations"],["Recruteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["Indicateur","Ref:Indicateurs"],["Niveau","Choice"],["CommentaireRecruteur","Text"],["DateReponse","DateTime"]]},
+    {"id":"FichesEnseignement","columns":[["Code","Text"],["Titre","Text"],["Description","Text"],["Perimetre","Ref:Perimetres"],["Statut","Choice"],["VersionActive","Ref:FicheVersions"],["Actif","Bool"],["CreatedAt","DateTime"],["CreatedBy","Ref:Utilisateurs"],["UpdatedAt","DateTime"]]},
+    {"id":"FicheVersions","columns":[["Uid","Text"],["Fiche","Ref:FichesEnseignement"],["NumeroVersion","Text"],["FichierPDF","Attachments"],["NomFichier","Text"],["TailleOctets","Int"],["EmpreinteSHA256","Text"],["Auteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["EstPubliee","Bool"],["DatePublication","DateTime"],["DateFinValidite","Date"],["CreatedAt","DateTime"]]},
+    {"id":"FicheIndicateurs","columns":[["Fiche","Ref:FichesEnseignement"],["Indicateur","Ref:Indicateurs"],["DeclencheRouge","Bool"],["DeclencheOrange","Bool"],["Actif","Bool"]]},
+    {"id":"FeuillesRoute","columns":[["Uid","Text"],["Evaluation","Ref:Evaluations"],["Recruteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["Superviseur","Ref:Utilisateurs"],["Statut","Choice"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
+    {"id":"ActionsProgres","columns":[["Uid","Text"],["FeuilleRoute","Ref:FeuillesRoute"],["Evaluation","Ref:Evaluations"],["Reponse","Ref:Reponses"],["Recruteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["Indicateur","Ref:Indicateurs"],["FicheVersion","Ref:FicheVersions"],["NiveauInitial","Choice"],["NiveauCourant","Choice"],["Statut","Choice"],["Echeance","Date"],["CommentaireRecruteur","Text"],["CommentaireSuperviseur","Text"],["DatePriseEnCompte","DateTime"],["DateDerniereDecision","DateTime"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
+    {"id":"Validations","columns":[["Uid","Text"],["ActionProgres","Ref:ActionsProgres"],["Recruteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["Superviseur","Ref:Utilisateurs"],["Decision","Choice"],["AncienNiveau","Choice"],["NouveauNiveau","Choice"],["Commentaire","Text"],["DateDecision","DateTime"]]},
+    {"id":"ConsultationsFiches","columns":[["Uid","Text"],["FicheVersion","Ref:FicheVersions"],["ActionProgres","Ref:ActionsProgres"],["Recruteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["TypeEvenement","Choice"],["DateEvenement","DateTime"]]},
+    {"id":"JournalAudit","columns":[["Uid","Text"],["ActeurEmail","Text"],["Acteur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["TypeObjet","Choice"],["ObjetUid","Text"],["Action","Text"],["Resume","Text"],["DateEvenement","DateTime"]]},
+    {"id":"Parametres","columns":[["Cle","Text"],["Valeur","Text"],["Description","Text"],["UpdatedAt","DateTime"],["UpdatedByEmail","Text"]]}
+  ]
+}
+

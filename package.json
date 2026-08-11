@@ -1,0 +1,21 @@
+{
+  "name": "ensosp-autoevaluation-spv",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "build": "pnpm --filter @ensosp/widget build && pnpm --filter @ensosp/api build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@types/node": "^22.15.30",
+    "eslint": "^9.32.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.39.0",
+    "vitest": "^3.2.4"
+  }
+}
+
