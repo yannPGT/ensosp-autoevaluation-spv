@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": { "dev": "vite", "build": "tsc -p tsconfig.json && vite build" },
-  "dependencies": { "@gristlabs/grist-plugin-api": "^1.0.0", "@vitejs/plugin-react": "^4.4.1", "vite": "^6.3.5", "react": "^19.1.0", "react-dom": "^19.1.0" },
+  "dependencies": { "@vitejs/plugin-react": "^4.4.1", "vite": "^6.3.5", "react": "^19.1.0", "react-dom": "^19.1.0" },
   "devDependencies": { "@types/react": "^19.1.6", "@types/react-dom": "^19.1.5" }
 }
-
