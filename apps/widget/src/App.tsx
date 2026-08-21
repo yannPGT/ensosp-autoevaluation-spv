@@ -1,15 +1,19 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
+import { chargerTableauDeBord, TableauDeBord } from "./dashboard-data.js";
 import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import {
   EntreeMenu,
-  indicateursAccueil,
   libellesRoles,
   menuPour,
   UtilisateurCourant,
 } from "./portal-data.js";
 
 type EtapeEvaluation = "QUESTIONNAIRE" | "BILAN";
+type EtatTableauDeBord =
+  | { statut: "chargement" }
+  | { statut: "pret"; tableau: TableauDeBord }
+  | { statut: "erreur"; message: string };
 
 const libellesNiveaux: Record<Niveau, string> = {
   ROUGE: "Action corrective nécessaire",
@@ -24,6 +28,8 @@ export function App() {
     { statut: "erreur"; message: string }
   >({ statut: "chargement" });
   const [tentativeConnexion, setTentativeConnexion] = useState(0);
+  const [tentativeTableau, setTentativeTableau] = useState(0);
+  const [etatTableau, setEtatTableau] = useState<EtatTableauDeBord>({ statut: "chargement" });
   const [pageActive, setPageActive] = useState("accueil");
   const [reponses, setReponses] = useState<Record<string, Niveau>>({});
   const [etapeEvaluation, setEtapeEvaluation] = useState<EtapeEvaluation>("QUESTIONNAIRE");
@@ -47,6 +53,19 @@ export function App() {
     return () => { actif = false; };
   }, [tentativeConnexion]);
 
+  useEffect(() => {
+    if (!utilisateur) return;
+    let actif = true;
+    setEtatTableau({ statut: "chargement" });
+    chargerTableauDeBord(utilisateur)
+      .then((tableau) => { if (actif) setEtatTableau({ statut: "pret", tableau }); })
+      .catch((erreur: unknown) => {
+        const message = erreur instanceof Error ? erreur.message : "Le tableau de bord n’a pas pu être chargé.";
+        if (actif) setEtatTableau({ statut: "erreur", message });
+      });
+    return () => { actif = false; };
+  }, [utilisateur, tentativeTableau]);
+
   if (etatUtilisateur.statut === "chargement") {
     return <EcranConnexion titre="Connexion à Grist" message="Identification de votre compte et chargement de vos habilitations…" />;
   }
@@ -61,7 +80,15 @@ export function App() {
       <div className="application-shell">
         <MenuNavigation menu={menu} pageActive={pageActive} changerPage={setPageActive} />
         <div className="contenu-application">
-          {pageActive === "accueil" && <Accueil utilisateur={utilisateur} menu={menu} changerPage={setPageActive} />}
+          {pageActive === "accueil" && (
+            <Accueil
+              utilisateur={utilisateur}
+              menu={menu}
+              changerPage={setPageActive}
+              etatTableau={etatTableau}
+              rechargerTableau={() => setTentativeTableau((valeur) => valeur + 1)}
+            />
+          )}
           {pageActive === "profil" && <Profil utilisateur={utilisateur} />}
           {pageActive === "evaluation" && (
             <Questionnaire
@@ -138,10 +165,12 @@ function MenuNavigation({ menu, pageActive, changerPage }: {
   );
 }
 
-function Accueil({ utilisateur, menu, changerPage }: {
+function Accueil({ utilisateur, menu, changerPage, etatTableau, rechargerTableau }: {
   utilisateur: UtilisateurCourant;
   menu: readonly EntreeMenu[];
   changerPage: (page: string) => void;
+  etatTableau: EtatTableauDeBord;
+  rechargerTableau: () => void;
 }) {
   const raccourcis = menu.filter((entree) => !["accueil", "profil"].includes(entree.id)).slice(0, 4);
   return (
@@ -149,14 +178,7 @@ function Accueil({ utilisateur, menu, changerPage }: {
       <p className="surtitre">{libellesRoles[utilisateur.role]}</p>
       <h2 id="titre-accueil">Bonjour {utilisateur.prenom}</h2>
       <p>Retrouvez ici les informations et opérations correspondant à votre rôle et à vos périmètres autorisés.</p>
-      <div className="indicateurs-accueil">
-        {indicateursAccueil(utilisateur.role).map((indicateur) => (
-          <article key={indicateur.libelle}>
-            <strong>{indicateur.valeur}</strong>
-            <span>{indicateur.libelle}</span>
-          </article>
-        ))}
-      </div>
+      <ContenuTableauDeBord etat={etatTableau} recharger={rechargerTableau} />
       <h3 className="titre-section">Accès rapides</h3>
       <div className="raccourcis">
         {raccourcis.map((entree) => (
@@ -167,6 +189,59 @@ function Accueil({ utilisateur, menu, changerPage }: {
         ))}
       </div>
     </section>
+  );
+}
+
+function ContenuTableauDeBord({ etat, recharger }: { etat: EtatTableauDeBord; recharger: () => void }) {
+  if (etat.statut === "chargement") {
+    return <div className="etat-tableau" aria-live="polite">Chargement des indicateurs autorisés par Grist…</div>;
+  }
+  if (etat.statut === "erreur") {
+    return (
+      <div className="etat-tableau etat-tableau-erreur" role="alert">
+        <strong>Tableau de bord indisponible</strong><p>{etat.message}</p>
+        <button type="button" onClick={recharger}>Réessayer</button>
+      </div>
+    );
+  }
+
+  const { tableau } = etat;
+  return (
+    <>
+      <div className="indicateurs-accueil">
+        {tableau.cartes.map((indicateur) => (
+          <article key={indicateur.libelle}>
+            <strong>{indicateur.valeur}</strong><span>{indicateur.libelle}</span>
+            {indicateur.detail && <small>{indicateur.detail}</small>}
+          </article>
+        ))}
+      </div>
+      {tableau.repartition && (
+        <section className="bloc-tableau" aria-labelledby="titre-repartition">
+          <h3 id="titre-repartition" className="titre-section">Répartition des indicateurs</h3>
+          <div className="repartition-niveaux">
+            <article className="niveau-rouge"><strong>{tableau.repartition.rouge}</strong><span>Priorités rouges</span></article>
+            <article className="niveau-orange"><strong>{tableau.repartition.orange}</strong><span>Vigilances orange</span></article>
+            <article className="niveau-vert"><strong>{tableau.repartition.vert}</strong><span>Points d’appui verts</span></article>
+          </div>
+        </section>
+      )}
+      {tableau.titreSuivi && (
+        <section className="bloc-tableau" aria-labelledby="titre-suivi">
+          <h3 id="titre-suivi" className="titre-section">{tableau.titreSuivi}</h3>
+          {tableau.lignes.length ? (
+            <div className="liste-suivi">
+              {tableau.lignes.map((ligne, index) => (
+                <article key={`${ligne.titre}-${index}`}>
+                  <div><strong>{ligne.titre}</strong><span>{ligne.detail}</span></div><b>{ligne.valeur}</b>
+                </article>
+              ))}
+            </div>
+          ) : <p className="aucun-suivi">Aucune donnée correspondante pour le moment.</p>}
+        </section>
+      )}
+      {tableau.note && <p className="note-tableau">{tableau.note}</p>}
+    </>
   );
 }
 

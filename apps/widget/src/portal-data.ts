@@ -1,6 +1,7 @@
 export type RoleUtilisateur = "ADMIN" | "SUPERVISEUR" | "RECRUTEUR";
 
 export interface UtilisateurCourant {
+  id: number;
   prenom: string;
   nom: string;
   email: string;
@@ -70,6 +71,7 @@ export function menuPour(utilisateur: UtilisateurCourant): readonly EntreeMenu[]
 
 const profilsDemonstration: Record<RoleUtilisateur, UtilisateurCourant> = {
   ADMIN: {
+    id: 1,
     prenom: "Alex",
     nom: "MARTIN",
     email: "alex.martin@example.invalid",
@@ -81,6 +83,7 @@ const profilsDemonstration: Record<RoleUtilisateur, UtilisateurCourant> = {
     actif: true,
   },
   SUPERVISEUR: {
+    id: 2,
     prenom: "Camille",
     nom: "BERNARD",
     email: "camille.bernard@example.invalid",
@@ -92,6 +95,7 @@ const profilsDemonstration: Record<RoleUtilisateur, UtilisateurCourant> = {
     actif: true,
   },
   RECRUTEUR: {
+    id: 3,
     prenom: "Morgan",
     nom: "ROBERT",
     email: "morgan.robert@example.invalid",

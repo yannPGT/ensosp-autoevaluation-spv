@@ -1,8 +1,8 @@
 import { RoleUtilisateur, UtilisateurCourant, utilisateurPrototype } from "./portal-data.js";
 
-type TableGrist = Record<string, unknown[]>;
+export type TableGrist = Record<string, unknown[]>;
 
-interface DocApiGrist {
+export interface DocApiGrist {
   applyUserActions(actions: unknown[][]): Promise<unknown>;
   fetchTable(tableId: string): Promise<TableGrist>;
 }
@@ -78,6 +78,7 @@ export function construireUtilisateur(
   if (!actif) throw new Error("Votre compte applicatif est désactivé.");
 
   return {
+    id: utilisateurId,
     prenom: texte(utilisateurs.Prenom?.[index]) || "Utilisateur",
     nom: texte(utilisateurs.Nom?.[index]),
     email: texte(utilisateurs.Email?.[index]),
@@ -90,6 +91,11 @@ export function construireUtilisateur(
     peutGererPedagogie: booleen(utilisateurs.PeutGererPedagogie?.[index]),
     actif,
   };
+}
+
+export function obtenirDocApiGrist(): DocApiGrist | null {
+  if (window.parent === window) return null;
+  return window.grist?.docApi ?? null;
 }
 
 function trouverIndex(table: TableGrist, colonne: string, valeur: unknown): number {
