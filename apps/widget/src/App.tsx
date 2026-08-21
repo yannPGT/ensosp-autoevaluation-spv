@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import { chargerTableauDeBord, TableauDeBord } from "./dashboard-data.js";
+import { chargerTableauDeBord, PersonnelTableauDeBord, TableauDeBord } from "./dashboard-data.js";
 import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import {
@@ -90,6 +90,13 @@ export function App() {
             />
           )}
           {pageActive === "profil" && <Profil utilisateur={utilisateur} />}
+          {pageActive === "tableau-bord" && (
+            <PageTableauDeBord
+              utilisateur={utilisateur}
+              etatTableau={etatTableau}
+              recharger={() => setTentativeTableau((valeur) => valeur + 1)}
+            />
+          )}
           {pageActive === "evaluation" && (
             <Questionnaire
               reponses={reponses}
@@ -103,7 +110,7 @@ export function App() {
               ? <Bilan reponses={reponses} modifier={() => { setEtapeEvaluation("QUESTIONNAIRE"); setPageActive("evaluation"); }} />
               : <VueMetier entree={entreeActive} message="Aucune évaluation validée n’est disponible pour le moment." />
           )}
-          {!(["accueil", "profil", "evaluation", "resultats"].includes(pageActive)) && (
+          {!(["accueil", "profil", "tableau-bord", "evaluation", "resultats"].includes(pageActive)) && (
             <VueMetier entree={entreeActive} message={messageEtatVide(pageActive)} />
           )}
         </div>
@@ -192,7 +199,27 @@ function Accueil({ utilisateur, menu, changerPage, etatTableau, rechargerTableau
   );
 }
 
-function ContenuTableauDeBord({ etat, recharger }: { etat: EtatTableauDeBord; recharger: () => void }) {
+function PageTableauDeBord({ utilisateur, etatTableau, recharger }: {
+  utilisateur: UtilisateurCourant;
+  etatTableau: EtatTableauDeBord;
+  recharger: () => void;
+}) {
+  const titre = utilisateur.role === "ADMIN" ? "Tableau de bord global" : "Tableau de bord du périmètre";
+  return (
+    <section className="page-carte" aria-labelledby="titre-tableau-de-bord">
+      <p className="surtitre">Pilotage</p>
+      <h2 id="titre-tableau-de-bord">{titre}</h2>
+      <p>Consultez les effectifs, les évaluations et les actions visibles dans le respect de vos ACL Grist.</p>
+      <ContenuTableauDeBord etat={etatTableau} recharger={recharger} afficherPersonnel />
+    </section>
+  );
+}
+
+function ContenuTableauDeBord({ etat, recharger, afficherPersonnel = false }: {
+  etat: EtatTableauDeBord;
+  recharger: () => void;
+  afficherPersonnel?: boolean;
+}) {
   if (etat.statut === "chargement") {
     return <div className="etat-tableau" aria-live="polite">Chargement des indicateurs autorisés par Grist…</div>;
   }
@@ -226,6 +253,7 @@ function ContenuTableauDeBord({ etat, recharger }: { etat: EtatTableauDeBord; re
           </div>
         </section>
       )}
+      {afficherPersonnel && <PersonnelSuivi personnel={tableau.personnel} />}
       {tableau.titreSuivi && (
         <section className="bloc-tableau" aria-labelledby="titre-suivi">
           <h3 id="titre-suivi" className="titre-section">{tableau.titreSuivi}</h3>
@@ -242,6 +270,42 @@ function ContenuTableauDeBord({ etat, recharger }: { etat: EtatTableauDeBord; re
       )}
       {tableau.note && <p className="note-tableau">{tableau.note}</p>}
     </>
+  );
+}
+
+function PersonnelSuivi({ personnel }: { personnel: readonly PersonnelTableauDeBord[] }) {
+  const [recherche, setRecherche] = useState("");
+  const [role, setRole] = useState("TOUS");
+  const rechercheNormalisee = recherche.trim().toLocaleLowerCase("fr");
+  const personnelFiltre = personnel.filter((personne) => {
+    const correspondRole = role === "TOUS" || personne.role === role;
+    const texteRecherche = `${personne.nom} ${personne.email} ${personne.perimetre}`.toLocaleLowerCase("fr");
+    return correspondRole && (!rechercheNormalisee || texteRecherche.includes(rechercheNormalisee));
+  });
+
+  return (
+    <section className="bloc-tableau" aria-labelledby="titre-personnel">
+      <div className="entete-personnel">
+        <div><h3 id="titre-personnel" className="titre-section">Personnel suivi</h3><p>{personnel.length} profil{personnel.length > 1 ? "s" : ""} actif{personnel.length > 1 ? "s" : ""}</p></div>
+        <div className="filtres-personnel">
+          <label>Rechercher<input type="search" value={recherche} onChange={(event) => setRecherche(event.target.value)} placeholder="Nom, courriel ou périmètre" /></label>
+          <label>Rôle<select value={role} onChange={(event) => setRole(event.target.value)}><option value="TOUS">Tous</option><option value="ADMIN">Administrateurs</option><option value="SUPERVISEUR">Superviseurs</option><option value="RECRUTEUR">Recruteurs</option></select></label>
+        </div>
+      </div>
+      {personnelFiltre.length ? (
+        <div className="table-personnel">
+          <div className="ligne-personnel ligne-personnel-entete"><span>Identité</span><span>Rôle et périmètre</span><span>Dernière évaluation</span><span>Actions</span></div>
+          {personnelFiltre.map((personne) => (
+            <article className="ligne-personnel" key={personne.id}>
+              <div><strong>{personne.nom}</strong><small>{personne.email || "Courriel non renseigné"}</small></div>
+              <div><strong>{libellesRoles[personne.role]}</strong><small>{personne.perimetre}</small></div>
+              <span>{personne.derniereEvaluation}</span>
+              <b>{personne.actionsOuvertes}</b>
+            </article>
+          ))}
+        </div>
+      ) : <p className="aucun-suivi">Aucun profil ne correspond aux filtres sélectionnés.</p>}
+    </section>
   );
 }
 

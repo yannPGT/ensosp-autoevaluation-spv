@@ -13,11 +13,22 @@ export interface LigneTableauDeBord {
   valeur: string;
 }
 
+export interface PersonnelTableauDeBord {
+  id: number;
+  nom: string;
+  email: string;
+  role: RoleUtilisateur;
+  perimetre: string;
+  derniereEvaluation: string;
+  actionsOuvertes: number;
+}
+
 export interface TableauDeBord {
   cartes: readonly CarteTableauDeBord[];
   repartition?: { rouge: number; orange: number; vert: number };
   titreSuivi?: string;
   lignes: readonly LigneTableauDeBord[];
+  personnel: readonly PersonnelTableauDeBord[];
   note?: string;
 }
 
@@ -85,6 +96,7 @@ function tableauRecruteur(utilisateur: UtilisateurCourant, tables: Record<string
         detail: ligne.Echeance ? `Échéance : ${dateFr(ligne.Echeance)}` : "Sans échéance",
         valeur: choix(ligne.NiveauCourant) || choix(ligne.NiveauInitial),
       })),
+    personnel: [],
     note: "La répartition correspond à votre dernière évaluation validée. Elle ne constitue pas une note globale.",
   };
 }
@@ -98,6 +110,7 @@ function tableauSuperviseur(tables: Record<string, TableGrist>): TableauDeBord {
   const reponses = lignes(tables.Reponses).filter((ligne) => idsEvaluations.has(ref(ligne.Evaluation) ?? 0));
   const actionsOuvertes = lignes(tables.ActionsProgres).filter(actionOuverte);
   const taux = recruteurs.length ? Math.round((dernieres.length / recruteurs.length) * 100) : 0;
+  const personnel = construirePersonnel(recruteurs, dernieres, actionsOuvertes, lignes(tables.Perimetres));
 
   return {
     cartes: [
@@ -124,6 +137,7 @@ function tableauSuperviseur(tables: Record<string, TableGrist>): TableauDeBord {
         valeur: `${actions.length} action${actions.length > 1 ? "s" : ""}`,
       };
     }),
+    personnel,
     note: "Les résultats agrègent uniquement la dernière évaluation validée de chaque recruteur visible.",
   };
 }
@@ -143,6 +157,7 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
   const fiches = lignes(tables.FichesEnseignement);
   const taux = recruteurs.length ? Math.round((dernieres.length / recruteurs.length) * 100) : 0;
   const nomsPerimetres = new Map(perimetres.map((ligne) => [nombre(ligne.id), texte(ligne.Nom) || texte(ligne.Code)]));
+  const personnel = construirePersonnel(utilisateursActifs, dernieres, actionsOuvertes, perimetres);
 
   const repartitionPerimetres = new Map<number, number>();
   dernieres.forEach((evaluation) => {
@@ -177,6 +192,7 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
         detail: "Recruteurs disposant d’un bilan récent",
         valeur: String(total),
       })),
+    personnel,
     note: "La consolidation utilise la dernière évaluation validée de chaque recruteur, sans classement ni note globale.",
   };
 }
@@ -184,8 +200,39 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
 function tablesPourRole(role: RoleUtilisateur): string[] {
   const communes = ["Evaluations", "Reponses", "ActionsProgres"];
   if (role === "RECRUTEUR") return communes;
-  if (role === "SUPERVISEUR") return [...communes, "Utilisateurs"];
+  if (role === "SUPERVISEUR") return [...communes, "Utilisateurs", "Perimetres"];
   return [...communes, "Utilisateurs", "Perimetres", "FichesEnseignement"];
+}
+
+function construirePersonnel(
+  utilisateurs: Record<string, unknown>[],
+  dernieresEvaluations: Record<string, unknown>[],
+  actionsOuvertes: Record<string, unknown>[],
+  perimetres: Record<string, unknown>[],
+): PersonnelTableauDeBord[] {
+  const nomsPerimetres = new Map(perimetres.map((ligne) => [nombre(ligne.id), texte(ligne.Nom) || texte(ligne.Code)]));
+  return utilisateurs
+    .map((utilisateur) => {
+      const id = nombre(utilisateur.id);
+      const role = roleUtilisateur(utilisateur.Role);
+      if (!id || !role) return null;
+      const evaluation = dernieresEvaluations.find((ligne) => ref(ligne.Recruteur) === id);
+      const actions = actionsOuvertes.filter((ligne) => ref(ligne.Recruteur) === id).length;
+      const nom = `${texte(utilisateur.Prenom)} ${texte(utilisateur.Nom)}`.trim();
+      return {
+        id,
+        nom: nom || texte(utilisateur.Email) || `Utilisateur ${id}`,
+        email: texte(utilisateur.Email),
+        role,
+        perimetre: nomsPerimetres.get(ref(utilisateur.PerimetrePrincipal)) || "Non renseigné",
+        derniereEvaluation: role === "RECRUTEUR"
+          ? (evaluation ? dateFr(evaluation.DateValidation ?? evaluation.UpdatedAt) : "Aucune évaluation")
+          : "Non concerné",
+        actionsOuvertes: actions,
+      } satisfies PersonnelTableauDeBord;
+    })
+    .filter((personne): personne is PersonnelTableauDeBord => personne !== null)
+    .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 }
 
 function tablesVides(): Record<string, TableGrist> {
@@ -281,6 +328,14 @@ function texte(valeur: unknown): string {
 
 function choix(valeur: unknown): string {
   return texte(valeur).trim().toUpperCase();
+}
+
+function roleUtilisateur(valeur: unknown): RoleUtilisateur | null {
+  const role = choix(valeur);
+  if (role === "ADMIN" || role === "ADMINISTRATEUR") return "ADMIN";
+  if (role === "SUPERVISEUR") return "SUPERVISEUR";
+  if (role === "RECRUTEUR") return "RECRUTEUR";
+  return null;
 }
 
 function booleen(valeur: unknown): boolean {
