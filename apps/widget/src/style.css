@@ -202,6 +202,58 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
 .bouton-secondaire { margin-top: 28px; color: #172334; background: #e7ebf0; }
 .bouton-secondaire:hover:not(:disabled) { background: #d7dde4; }
 
+.entete-module { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.entete-module > div { max-width: 720px; }
+.entete-module > div > p:last-child { margin-bottom: 0; color: #526174; }
+.synthese-utilisateurs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 26px 0; }
+.synthese-utilisateurs > div { display: grid; gap: 5px; padding: 16px; background: #f4f6f8; border: 1px solid #e1e5ea; border-radius: 12px; }
+.synthese-utilisateurs strong { font-size: 1.7rem; }
+.synthese-utilisateurs span { color: #657386; font-size: .76rem; font-weight: 800; }
+.message-formulaire { padding: 12px 14px; border-radius: 9px; font-weight: 700; }
+.message-succes { color: #175c37; background: #eaf7ef; }
+.message-erreur { color: #8f1d27; background: #fff0f1; }
+.barre-filtres-utilisateurs { display: grid; grid-template-columns: minmax(220px, 1fr) 180px 145px; gap: 10px; margin-bottom: 18px; }
+.barre-filtres-utilisateurs label, .formulaire-utilisateur label { display: grid; gap: 5px; color: #526174; font-size: .76rem; font-weight: 800; }
+.barre-filtres-utilisateurs input, .barre-filtres-utilisateurs select, .formulaire-utilisateur input, .formulaire-utilisateur select { width: 100%; min-height: 43px; padding: 9px 11px; color: #172334; background: #fff; border: 1px solid #cbd3dd; border-radius: 8px; }
+.barre-filtres-utilisateurs select:focus-visible, .formulaire-utilisateur select:focus-visible { outline: 3px solid #2b70b9; outline-offset: 3px; }
+.corps-utilisateurs { display: grid; gap: 18px; }
+.corps-utilisateurs.avec-formulaire { grid-template-columns: minmax(0, 1fr) minmax(310px, 42%); align-items: start; }
+.liste-utilisateurs { display: grid; gap: 12px; }
+.carte-utilisateur { padding: 17px; border: 1px solid #dfe4ea; border-radius: 13px; }
+.identite-utilisateur { display: flex; align-items: center; gap: 12px; }
+.identite-utilisateur h3 { font-size: 1rem; }
+.identite-utilisateur p { margin: 3px 0 0; color: #657386; font-size: .78rem; overflow-wrap: anywhere; }
+.avatar-utilisateur { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; color: #fff; background: #172334; border-radius: 50%; font-size: .78rem; font-weight: 900; }
+.badges-utilisateur { display: flex; flex-wrap: wrap; gap: 6px; margin: 13px 0; }
+.badge-role, .badge-statut, .badge-pedagogie { padding: 5px 8px; border-radius: 999px; font-size: .68rem; font-weight: 900; }
+.role-admin { color: #fff; background: #172334; }
+.role-superviseur { color: #164d76; background: #e8f3fb; }
+.role-recruteur { color: #67460b; background: #fff3d8; }
+.statut-actif { color: #175c37; background: #eaf7ef; }
+.statut-inactif { color: #7a2730; background: #f6e9ea; }
+.badge-pedagogie { color: #69357d; background: #f3eafa; }
+.carte-utilisateur dl { display: grid; gap: 8px; margin: 0; }
+.carte-utilisateur dl > div { display: grid; grid-template-columns: 125px 1fr; gap: 10px; }
+.carte-utilisateur dt { color: #657386; font-size: .72rem; font-weight: 800; }
+.carte-utilisateur dd { margin: 0; font-size: .78rem; }
+.carte-utilisateur .bouton-secondaire { min-height: 38px; margin-top: 14px; padding: 8px 12px; font-size: .75rem; }
+.panneau-utilisateur { position: sticky; top: 18px; padding: 20px; background: #f7f8fa; border: 1px solid #d8dee7; border-radius: 14px; box-shadow: 0 12px 30px rgb(23 35 52 / 10%); }
+.entete-panneau { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.fermer-panneau { min-width: 36px; min-height: 36px; padding: 0; color: #526174; background: transparent; font-size: 1.5rem; }
+.fermer-panneau:hover:not(:disabled) { color: #172334; background: #e4e8ed; }
+.formulaire-utilisateur { display: grid; gap: 14px; }
+.formulaire-utilisateur small { color: #6a7685; font-weight: 500; line-height: 1.4; }
+.deux-colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.formulaire-utilisateur .ligne-case { display: flex; align-items: center; gap: 9px; color: #172334; }
+.formulaire-utilisateur .ligne-case input { width: 19px; min-height: 19px; accent-color: #172334; }
+.encart-information { padding: 12px; color: #344154; background: #eef2f6; border-radius: 9px; }
+.encart-information p { margin: 5px 0; font-size: .78rem; }
+.encart-information small { display: block; }
+.alerte-desactivation { margin: 0; padding: 10px; color: #7a2730; background: #f6e9ea; border-radius: 8px; font-size: .75rem; font-weight: 700; }
+.formulaire-utilisateur .actions-formulaire { position: static; margin-top: 5px; padding: 0; background: transparent; border: 0; box-shadow: none; }
+.formulaire-utilisateur .actions-formulaire button { min-height: 42px; padding: 9px 13px; }
+.formulaire-utilisateur .actions-formulaire .bouton-secondaire { margin: 0; }
+
 @media (max-width: 850px) {
   .application-shell { grid-template-columns: 1fr; }
   .menu-lateral { position: static; padding: 12px; overflow: hidden; }
@@ -214,6 +266,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
   .filtres-personnel input { min-width: 0; width: 100%; }
   .ligne-personnel { grid-template-columns: 1fr 1fr; }
   .ligne-personnel-entete { display: none; }
+  .entete-module { align-items: stretch; flex-direction: column; }
+  .entete-module > button { align-self: flex-start; }
+  .synthese-utilisateurs { grid-template-columns: 1fr 1fr; }
+  .barre-filtres-utilisateurs { grid-template-columns: 1fr 1fr; }
+  .barre-filtres-utilisateurs label:first-child { grid-column: 1 / -1; }
+  .corps-utilisateurs.avec-formulaire { grid-template-columns: 1fr; }
+  .panneau-utilisateur { position: static; grid-row: 1; }
   .choix { grid-template-columns: 1fr; }
   .option { min-height: 0; }
 }
@@ -233,4 +292,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
   .synthese { grid-template-columns: 1fr; }
   .resultat { grid-template-columns: 1fr; }
   .badge { justify-self: start; }
+  .synthese-utilisateurs, .barre-filtres-utilisateurs, .deux-colonnes { grid-template-columns: 1fr; }
+  .barre-filtres-utilisateurs label:first-child { grid-column: auto; }
+  .carte-utilisateur dl > div { grid-template-columns: 1fr; gap: 2px; }
 }

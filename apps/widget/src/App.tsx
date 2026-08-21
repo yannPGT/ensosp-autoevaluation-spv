@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { chargerTableauDeBord, PersonnelTableauDeBord, TableauDeBord } from "./dashboard-data.js";
 import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
+import { ModuleUtilisateurs } from "./UsersModule.js";
 import {
   EntreeMenu,
   libellesRoles,
@@ -97,6 +98,7 @@ export function App() {
               recharger={() => setTentativeTableau((valeur) => valeur + 1)}
             />
           )}
+          {pageActive === "utilisateurs" && <ModuleUtilisateurs utilisateurCourantId={utilisateur.id} />}
           {pageActive === "evaluation" && (
             <Questionnaire
               reponses={reponses}
@@ -110,7 +112,7 @@ export function App() {
               ? <Bilan reponses={reponses} modifier={() => { setEtapeEvaluation("QUESTIONNAIRE"); setPageActive("evaluation"); }} />
               : <VueMetier entree={entreeActive} message="Aucune évaluation validée n’est disponible pour le moment." />
           )}
-          {!(["accueil", "profil", "tableau-bord", "evaluation", "resultats"].includes(pageActive)) && (
+          {!(["accueil", "profil", "tableau-bord", "utilisateurs", "evaluation", "resultats"].includes(pageActive)) && (
             <VueMetier entree={entreeActive} message={messageEtatVide(pageActive)} />
           )}
         </div>
