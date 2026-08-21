@@ -314,6 +314,41 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
 .carte-affectation .bouton-secondaire { align-self: flex-start; min-height: 38px; margin: auto 0 0; padding: 8px 11px; font-size: .72rem; }
 .panneau-affectation { position: sticky; top: 18px; }
 
+.synthese-referentiel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 26px 0; }
+.synthese-referentiel > div { display: grid; gap: 5px; padding: 16px; background: #f4f6f8; border: 1px solid #e1e5ea; border-radius: 12px; }
+.synthese-referentiel strong { font-size: 1.7rem; }
+.synthese-referentiel span { color: #657386; font-size: .76rem; font-weight: 800; }
+.onglets-referentiel { display: flex; gap: 6px; margin: 6px 0 18px; padding-bottom: 8px; border-bottom: 1px solid #dfe4ea; overflow-x: auto; }
+.onglets-referentiel button { flex: 0 0 auto; min-height: 42px; padding: 9px 14px; color: #526174; background: transparent; }
+.onglets-referentiel button:hover:not(:disabled) { color: #172334; background: #eef1f4; }
+.onglets-referentiel .onglet-actif, .onglets-referentiel .onglet-actif:hover:not(:disabled) { color: #fff; background: #172334; }
+.onglets-referentiel span { display: inline-grid; min-width: 22px; min-height: 22px; margin-left: 6px; place-items: center; background: rgb(128 139 153 / 16%); border-radius: 999px; font-size: .7rem; }
+.onglets-referentiel .onglet-actif span { background: rgb(255 255 255 / 18%); }
+.filtres-referentiel { display: grid; grid-template-columns: minmax(220px, 1fr) 220px 145px; gap: 10px; margin-bottom: 18px; }
+.filtres-referentiel label { display: grid; gap: 5px; color: #526174; font-size: .76rem; font-weight: 800; }
+.filtres-referentiel input, .filtres-referentiel select, .formulaire-utilisateur textarea { width: 100%; min-height: 43px; padding: 9px 11px; color: #172334; background: #fff; border: 1px solid #cbd3dd; border-radius: 8px; font: inherit; }
+.formulaire-utilisateur textarea { min-height: 92px; resize: vertical; }
+.filtres-referentiel input:focus-visible, .filtres-referentiel select:focus-visible, .formulaire-utilisateur input:focus-visible, .formulaire-utilisateur textarea:focus-visible { outline: 3px solid #2b70b9; outline-offset: 3px; }
+.corps-referentiel { display: grid; gap: 18px; }
+.corps-referentiel.avec-formulaire { grid-template-columns: minmax(0, 1fr) minmax(310px, 42%); align-items: start; }
+.liste-referentiel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.carte-reference { display: flex; min-width: 0; flex-direction: column; padding: 17px; border: 1px solid #dfe4ea; border-radius: 13px; }
+.titre-reference { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.titre-reference > div { min-width: 0; }
+.titre-reference code { color: #b4202a; font-size: .68rem; font-weight: 900; overflow-wrap: anywhere; }
+.titre-reference h3 { margin-top: 5px; font-size: 1rem; overflow-wrap: anywhere; }
+.carte-reference > p { margin: 13px 0 8px; color: #526174; font-size: .8rem; }
+.carte-reference > small { color: #657386; line-height: 1.5; }
+.carte-reference > div:last-child { display: flex; flex-wrap: wrap; gap: 7px; margin-top: auto; padding-top: 15px; }
+.carte-reference .bouton-secondaire { min-height: 38px; margin: 0; padding: 8px 11px; font-size: .72rem; }
+.badge-campagne { padding: 5px 8px; border-radius: 999px; font-size: .65rem; font-weight: 900; }
+.campagne-brouillon { color: #526174; background: #edf0f3; }
+.campagne-ouverte { color: #175c37; background: #eaf7ef; }
+.campagne-cloturee { color: #8b4b05; background: #fff3df; }
+.campagne-archivee { color: #69357d; background: #f3eafa; }
+.panneau-reference { position: sticky; top: 18px; }
+.liste-referentiel > .aucun-suivi { grid-column: 1 / -1; }
+
 @media (max-width: 850px) {
   .application-shell { grid-template-columns: 1fr; }
   .menu-lateral { position: static; padding: 12px; overflow: hidden; }
@@ -339,6 +374,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
   .filtres-affectations label:first-child { grid-column: 1 / -1; }
   .corps-affectations.avec-formulaire { grid-template-columns: 1fr; }
   .panneau-affectation { position: static; grid-row: 1; }
+  .synthese-referentiel { grid-template-columns: 1fr 1fr; }
+  .filtres-referentiel { grid-template-columns: 1fr 1fr; }
+  .filtres-referentiel label:first-child { grid-column: 1 / -1; }
+  .corps-referentiel.avec-formulaire { grid-template-columns: 1fr; }
+  .panneau-reference { position: static; grid-row: 1; }
   .choix { grid-template-columns: 1fr; }
   .option { min-height: 0; }
 }
@@ -367,4 +407,6 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
   .filtres-affectations label:first-child { grid-column: auto; }
   .alerte-synchronisation > div { align-items: stretch; flex-direction: column; }
   .alerte-synchronisation button { align-self: flex-start; }
+  .synthese-referentiel, .filtres-referentiel, .liste-referentiel { grid-template-columns: 1fr; }
+  .filtres-referentiel label:first-child { grid-column: auto; }
 }
