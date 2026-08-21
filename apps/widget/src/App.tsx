@@ -1,11 +1,11 @@
-import React, { FormEvent, useMemo, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data.js";
+import { chargerUtilisateurCourant } from "./grist-context.js";
 import {
   EntreeMenu,
   indicateursAccueil,
   libellesRoles,
   menuPour,
-  utilisateurPrototype,
   UtilisateurCourant,
 } from "./portal-data.js";
 
@@ -18,16 +18,42 @@ const libellesNiveaux: Record<Niveau, string> = {
 };
 
 export function App() {
-  const utilisateur = useMemo(utilisateurPrototype, []);
-  const menu = useMemo(() => menuPour(utilisateur), [utilisateur]);
+  const [etatUtilisateur, setEtatUtilisateur] = useState<
+    { statut: "chargement" } |
+    { statut: "pret"; utilisateur: UtilisateurCourant } |
+    { statut: "erreur"; message: string }
+  >({ statut: "chargement" });
+  const [tentativeConnexion, setTentativeConnexion] = useState(0);
   const [pageActive, setPageActive] = useState("accueil");
   const [reponses, setReponses] = useState<Record<string, Niveau>>({});
   const [etapeEvaluation, setEtapeEvaluation] = useState<EtapeEvaluation>("QUESTIONNAIRE");
+  const utilisateur = etatUtilisateur.statut === "pret" ? etatUtilisateur.utilisateur : null;
+  const menu = useMemo(() => utilisateur ? menuPour(utilisateur) : [], [utilisateur]);
   const entreeActive = menu.find((entree) => entree.id === pageActive) ?? {
     id: "accueil",
     libelle: "Accueil",
     description: "Vue d’ensemble de votre espace personnel.",
   };
+
+  useEffect(() => {
+    let actif = true;
+    setEtatUtilisateur({ statut: "chargement" });
+    chargerUtilisateurCourant()
+      .then((profil) => { if (actif) setEtatUtilisateur({ statut: "pret", utilisateur: profil }); })
+      .catch((erreur: unknown) => {
+        const message = erreur instanceof Error ? erreur.message : "Une erreur inconnue empêche l’identification.";
+        if (actif) setEtatUtilisateur({ statut: "erreur", message });
+      });
+    return () => { actif = false; };
+  }, [tentativeConnexion]);
+
+  if (etatUtilisateur.statut === "chargement") {
+    return <EcranConnexion titre="Connexion à Grist" message="Identification de votre compte et chargement de vos habilitations…" />;
+  }
+  if (etatUtilisateur.statut === "erreur") {
+    return <EcranConnexion titre="Profil indisponible" message={etatUtilisateur.message} reessayer={() => setTentativeConnexion((valeur) => valeur + 1)} />;
+  }
+  if (!utilisateur) return null;
 
   return (
     <main>
@@ -55,6 +81,18 @@ export function App() {
           )}
         </div>
       </div>
+    </main>
+  );
+}
+
+function EcranConnexion({ titre, message, reessayer }: { titre: string; message: string; reessayer?: () => void }) {
+  return (
+    <main>
+      <header><p className="marque">ENSOSPP</p><h1>Auto-évaluation des pratiques de recrutement SPV</h1></header>
+      <section className="page-carte ecran-connexion" aria-live="polite">
+        <p className="surtitre">Identification sécurisée</p><h2>{titre}</h2><p>{message}</p>
+        {reessayer && <button type="button" onClick={reessayer}>Réessayer</button>}
+      </section>
     </main>
   );
 }

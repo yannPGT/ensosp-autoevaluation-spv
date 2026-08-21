@@ -99,6 +99,8 @@ p { line-height: 1.55; }
 .etat-vide strong { display: block; font-size: 1.05rem; }
 .etat-vide p { max-width: 620px; margin: 8px auto; color: #526174; }
 .etat-vide span { color: #7b8796; font-size: .82rem; }
+.ecran-connexion { margin-top: 24px; text-align: center; }
+.ecran-connexion p:not(.surtitre) { max-width: 620px; margin: 12px auto 22px; color: #526174; }
 
 .section-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .section-intro > div { max-width: 750px; }
