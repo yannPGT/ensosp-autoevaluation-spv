@@ -40,8 +40,8 @@ describe("construireTableauDeBord", () => {
   it("agrège seulement la dernière évaluation validée de chaque recruteur", () => {
     const tableau = construireTableauDeBord({ ...baseUtilisateur, role: "SUPERVISEUR" }, {
       Utilisateurs: {
-        id: [7, 8], Prenom: ["Alice", "Bob"], Nom: ["DURAND", "MARTIN"],
-        Role: ["RECRUTEUR", "RECRUTEUR"], Actif: [true, true],
+        id: [7, 8, 9], Prenom: ["Alice", "Bob", "Claire"], Nom: ["DURAND", "MARTIN", "PETIT"],
+        Role: ["RECRUTEUR", "RECRUTEUR", "RECRUTEUR"], Actif: [true, true, true],
       },
       Evaluations: {
         id: [10, 11, 12], Recruteur: [7, 7, 8], Statut: ["VALIDEE", "VALIDEE", "VALIDEE"],
@@ -51,9 +51,11 @@ describe("construireTableauDeBord", () => {
       ActionsProgres: { id: [], Statut: [] },
     });
 
-    expect(carte(tableau, "Taux de réalisation").valeur).toBe("100 %");
+    expect(carte(tableau, "Taux de réalisation").valeur).toBe("67 %");
     expect(tableau.repartition).toEqual({ rouge: 0, orange: 1, vert: 1 });
-    expect(tableau.lignes).toHaveLength(2);
+    expect(tableau.lignes).toHaveLength(3);
+    expect(tableau.personnel).toHaveLength(3);
+    expect(tableau.personnel.find((personne) => personne.id === 9)?.derniereEvaluation).toBe("Aucune évaluation");
   });
 
   it("produit la consolidation administrateur sans classement", () => {

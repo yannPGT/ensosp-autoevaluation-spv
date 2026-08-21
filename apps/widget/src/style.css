@@ -118,6 +118,20 @@ p { line-height: 1.55; }
 .liste-suivi b { flex: 0 0 auto; color: #172334; font-size: .85rem; }
 .aucun-suivi { padding: 20px; color: #657386; background: #f6f8fa; border-radius: 12px; text-align: center; }
 .note-tableau { margin: -12px 0 30px; padding-left: 12px; color: #6e7a89; border-left: 3px solid #b8c1cc; font-size: .78rem; }
+.entete-personnel { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
+.entete-personnel .titre-section { margin-bottom: 3px; }
+.entete-personnel p { margin: 0; color: #657386; font-size: .8rem; }
+.filtres-personnel { display: flex; gap: 10px; }
+.filtres-personnel label { display: grid; gap: 4px; color: #657386; font-size: .72rem; font-weight: 800; }
+.filtres-personnel input, .filtres-personnel select { min-height: 40px; padding: 8px 10px; color: #172334; background: #fff; border: 1px solid #cbd3dd; border-radius: 8px; }
+.filtres-personnel input { min-width: 220px; }
+.table-personnel { border: 1px solid #d8dee7; border-radius: 13px; overflow: hidden; }
+.ligne-personnel { display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(180px, 1.2fr) minmax(140px, 1fr) 70px; gap: 16px; align-items: center; padding: 14px 16px; }
+.ligne-personnel + .ligne-personnel { border-top: 1px solid #e8ecf0; }
+.ligne-personnel > div { display: grid; gap: 3px; min-width: 0; }
+.ligne-personnel small { color: #657386; overflow-wrap: anywhere; }
+.ligne-personnel b { justify-self: center; }
+.ligne-personnel-entete { color: #657386; background: #f4f6f8; font-size: .72rem; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
 
 .section-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .section-intro > div { max-width: 750px; }
@@ -195,6 +209,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
   .entree-menu { flex: 0 0 auto; white-space: nowrap; }
   .indicateurs-accueil { grid-template-columns: 1fr; }
   .repartition-niveaux { grid-template-columns: 1fr; }
+  .entete-personnel { align-items: stretch; flex-direction: column; }
+  .filtres-personnel { flex-direction: column; }
+  .filtres-personnel input { min-width: 0; width: 100%; }
+  .ligne-personnel { grid-template-columns: 1fr 1fr; }
+  .ligne-personnel-entete { display: none; }
   .choix { grid-template-columns: 1fr; }
   .option { min-height: 0; }
 }
