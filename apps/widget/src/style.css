@@ -283,6 +283,37 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
 .actions-territoire .bouton-secondaire { min-height: 38px; margin: 0; padding: 8px 11px; font-size: .72rem; }
 .panneau-territoire { position: sticky; top: 18px; }
 
+.synthese-affectations { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 26px 0; }
+.indicateur-affectation { display: grid; gap: 5px; padding: 17px; background: #f4f6f8; border: 1px solid #e1e5ea; border-radius: 12px; }
+.indicateur-affectation strong { font-size: 1.8rem; }
+.indicateur-affectation span { color: #657386; font-size: .76rem; font-weight: 800; }
+.indicateur-affectation.alerte { color: #8f1d27; background: #fff0f1; border-color: #efc9cc; }
+.alerte-synchronisation { margin-bottom: 20px; padding: 16px; background: #fff7e8; border: 1px solid #efd7ad; border-radius: 12px; }
+.alerte-synchronisation > p { margin: 5px 0 12px; color: #685327; font-size: .78rem; }
+.alerte-synchronisation > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #ead9b9; }
+.alerte-synchronisation span { display: grid; gap: 2px; }
+.alerte-synchronisation small { color: #756744; }
+.alerte-synchronisation button { min-height: 36px; padding: 7px 11px; font-size: .72rem; }
+.filtres-affectations { display: grid; grid-template-columns: minmax(210px, 1fr) 180px 180px 140px; gap: 10px; margin-bottom: 18px; }
+.filtres-affectations label { display: grid; gap: 5px; color: #526174; font-size: .76rem; font-weight: 800; }
+.filtres-affectations input, .filtres-affectations select { width: 100%; min-height: 43px; padding: 9px 11px; color: #172334; background: #fff; border: 1px solid #cbd3dd; border-radius: 8px; }
+.corps-affectations { display: grid; gap: 18px; }
+.corps-affectations.avec-formulaire { grid-template-columns: minmax(0, 1fr) minmax(310px, 42%); align-items: start; }
+.liste-affectations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.carte-affectation { display: flex; min-width: 0; flex-direction: column; padding: 17px; border: 1px solid #dfe4ea; border-radius: 13px; }
+.titre-affectation { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.titre-affectation > div { min-width: 0; }
+.titre-affectation h3 { font-size: 1rem; }
+.titre-affectation p { margin: 3px 0 0; color: #657386; font-size: .75rem; overflow-wrap: anywhere; }
+.perimetre-affectation { display: grid; gap: 3px; margin: 15px 0; padding: 11px; background: #f4f6f8; border-radius: 9px; }
+.perimetre-affectation small { color: #657386; }
+.carte-affectation dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; }
+.carte-affectation dl > div { display: grid; gap: 2px; }
+.carte-affectation dt { color: #657386; font-size: .7rem; font-weight: 800; }
+.carte-affectation dd { margin: 0; font-size: .78rem; }
+.carte-affectation .bouton-secondaire { align-self: flex-start; min-height: 38px; margin: auto 0 0; padding: 8px 11px; font-size: .72rem; }
+.panneau-affectation { position: sticky; top: 18px; }
+
 @media (max-width: 850px) {
   .application-shell { grid-template-columns: 1fr; }
   .menu-lateral { position: static; padding: 12px; overflow: hidden; }
@@ -304,6 +335,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
   .panneau-utilisateur { position: static; grid-row: 1; }
   .corps-territoires.avec-formulaire { grid-template-columns: 1fr; }
   .panneau-territoire { position: static; grid-row: 1; }
+  .filtres-affectations { grid-template-columns: 1fr 1fr; }
+  .filtres-affectations label:first-child { grid-column: 1 / -1; }
+  .corps-affectations.avec-formulaire { grid-template-columns: 1fr; }
+  .panneau-affectation { position: static; grid-row: 1; }
   .choix { grid-template-columns: 1fr; }
   .option { min-height: 0; }
 }
@@ -328,4 +363,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
   .carte-utilisateur dl > div { grid-template-columns: 1fr; gap: 2px; }
   .synthese-territoires, .filtres-territoires, .liste-territoires { grid-template-columns: 1fr; }
   .carte-territoire dl > div { grid-template-columns: 1fr; gap: 2px; }
+  .synthese-affectations, .filtres-affectations, .liste-affectations { grid-template-columns: 1fr; }
+  .filtres-affectations label:first-child { grid-column: auto; }
+  .alerte-synchronisation > div { align-items: stretch; flex-direction: column; }
+  .alerte-synchronisation button { align-self: flex-start; }
 }

@@ -4,6 +4,7 @@ import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import { ModuleUtilisateurs } from "./UsersModule.js";
 import { ModuleTerritoires } from "./TerritoriesModule.js";
+import { ModuleAffectations } from "./AssignmentsModule.js";
 import {
   EntreeMenu,
   libellesRoles,
@@ -101,6 +102,7 @@ export function App() {
           )}
           {pageActive === "utilisateurs" && <ModuleUtilisateurs utilisateurCourantId={utilisateur.id} />}
           {pageActive === "territoires" && <ModuleTerritoires />}
+          {pageActive === "affectations" && <ModuleAffectations />}
           {pageActive === "evaluation" && (
             <Questionnaire
               reponses={reponses}
@@ -114,7 +116,7 @@ export function App() {
               ? <Bilan reponses={reponses} modifier={() => { setEtapeEvaluation("QUESTIONNAIRE"); setPageActive("evaluation"); }} />
               : <VueMetier entree={entreeActive} message="Aucune évaluation validée n’est disponible pour le moment." />
           )}
-          {!(["accueil", "profil", "tableau-bord", "utilisateurs", "territoires", "evaluation", "resultats"].includes(pageActive)) && (
+          {!(["accueil", "profil", "tableau-bord", "utilisateurs", "territoires", "affectations", "evaluation", "resultats"].includes(pageActive)) && (
             <VueMetier entree={entreeActive} message={messageEtatVide(pageActive)} />
           )}
         </div>
