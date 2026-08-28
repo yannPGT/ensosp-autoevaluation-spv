@@ -5,6 +5,7 @@ export type TableGrist = Record<string, unknown[]>;
 export interface DocApiGrist {
   applyUserActions(actions: unknown[][]): Promise<unknown>;
   fetchTable(tableId: string): Promise<TableGrist>;
+  getAccessToken?(options?: { readOnly?: boolean }): Promise<{ baseUrl: string; token: string }>;
 }
 
 interface ApiGrist {
