@@ -377,6 +377,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   const [evaluationId, setEvaluationId] = useState<number | null>(null);
   const [etatSauvegarde, setEtatSauvegarde] = useState("Chargement du brouillon…");
   const [erreurSauvegarde, setErreurSauvegarde] = useState("");
+  const [avertissementFinalisation, setAvertissementFinalisation] = useState("");
   const [operationEvaluation, setOperationEvaluation] = useState(false);
   const creationEnCours = useRef<Promise<number> | null>(null);
   const derniereSauvegarde = useRef<Promise<void>>(Promise.resolve());
@@ -415,7 +416,8 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     <section className="page-carte confirmation-evaluation" aria-labelledby="evaluation-finalisee">
       <p className="surtitre">Évaluation enregistrée</p>
       <h2 id="evaluation-finalisee">Votre évaluation est finalisée</h2>
-      <p>Vos réponses sont désormais validées et votre parcours de progression a été créé. Elles ne peuvent plus être modifiées.</p>
+      <p>{avertissementFinalisation ? "Vos réponses sont désormais validées et ne peuvent plus être modifiées." : "Vos réponses sont désormais validées et votre parcours de progression a été créé. Elles ne peuvent plus être modifiées."}</p>
+      {avertissementFinalisation && <p className="message-formulaire message-avertissement" role="status">{avertissementFinalisation}</p>}
       <button type="button" onClick={() => { setEtape("BILAN"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Voir mon bilan</button>
     </section>
   );
@@ -427,7 +429,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     try {
       await derniereSauvegarde.current;
       await assurerEvaluation();
-      setEtatSauvegarde("Votre évaluation est enregistrée. Vous pourrez la reprendre ultérieurement.");
+      setEtatSauvegarde("Brouillon enregistré : votre évaluation n’est pas validée et reste modifiable.");
     } catch (erreur) {
       setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être enregistrée.");
     } finally { setOperationEvaluation(false); }
@@ -440,7 +442,10 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
       try {
         await derniereSauvegarde.current;
         const id = await assurerEvaluation();
-        if (id !== -1) await validerEvaluation(id, utilisateur);
+        if (id !== -1) {
+          const resultat = await validerEvaluation(id, utilisateur);
+          setAvertissementFinalisation(resultat.avertissement ?? "");
+        }
         setEtatSauvegarde("Évaluation validée"); setEtape("FINALISEE");
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être validée."); }
@@ -457,7 +462,6 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
         </div>
         <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateursEvaluation.length}<span>réponses</span></p>
       </div>
-      <p className="etat-sauvegarde" aria-live="polite">{erreurSauvegarde || etatSauvegarde}</p>
       <form onSubmit={valider}>
         {axesEvaluation.map((axe, axeIndex) => (
           <section className="axe" aria-labelledby={`titre-${axe.code}`} key={axe.code}>
@@ -483,10 +487,21 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
           </section>
         ))}
         <div className="actions-formulaire">
-          <p>{complet ? "Toutes les réponses sont renseignées. Vous pouvez maintenant valider définitivement votre évaluation." : `${nombreRestant} indicateur${nombreRestant > 1 ? "s" : ""} restant${nombreRestant > 1 ? "s" : ""}.`}</p>
+          <div className="resume-actions-evaluation">
+            <p>{complet ? "Toutes les réponses sont renseignées." : `${nombreRestant} indicateur${nombreRestant > 1 ? "s" : ""} restant${nombreRestant > 1 ? "s" : ""}.`}</p>
+            <p className={`message-action-evaluation${erreurSauvegarde ? " message-action-erreur" : ""}`} aria-live="polite">{erreurSauvegarde || etatSauvegarde}</p>
+          </div>
           <div className="boutons-evaluation">
-            <button className="bouton-secondaire" type="button" onClick={() => { void enregistrerBrouillon(); }} disabled={operationEvaluation || nombreReponses === 0}>Enregistrer mon évaluation</button>
-            <button type="submit" disabled={!complet || operationEvaluation}>{operationEvaluation && complet ? "Validation…" : "Valider mon évaluation"}</button>
+            <div className="action-evaluation-avec-aide">
+              <button className="bouton-secondaire bouton-enregistrer" type="button" aria-describedby="aide-enregistrer" onClick={() => { void enregistrerBrouillon(); }} disabled={operationEvaluation || nombreReponses === 0}>Enregistrer le brouillon</button>
+              <span className="info-bulle-action" role="tooltip" id="aide-enregistrer">Enregistre votre travail sans valider l’évaluation. Vous pourrez modifier vos réponses et reprendre plus tard.</span>
+              <small>Non définitif · reste modifiable</small>
+            </div>
+            <div className="action-evaluation-avec-aide">
+              <button className="bouton-valider" type="submit" aria-describedby="aide-valider" disabled={!complet || operationEvaluation}>{operationEvaluation && complet ? "Validation…" : "Valider mon évaluation"}</button>
+              <span className="info-bulle-action" role="tooltip" id="aide-valider">Valide définitivement l’évaluation. Vos réponses seront verrouillées et votre bilan deviendra accessible.</span>
+              <small>Définitif · réponses verrouillées</small>
+            </div>
           </div>
         </div>
       </form>
