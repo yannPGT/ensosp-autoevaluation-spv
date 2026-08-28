@@ -1,11 +1,16 @@
-import React, { FormEvent, useEffect, useMemo, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { chargerTableauDeBord, PersonnelTableauDeBord, TableauDeBord } from "./dashboard-data.js";
 import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data.js";
+import { chargerSessionEvaluation, creerEvaluation, enregistrerReponse, validerEvaluation } from "./evaluation-store.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import { ModuleUtilisateurs } from "./UsersModule.js";
 import { ModuleTerritoires } from "./TerritoriesModule.js";
 import { ModuleAffectations } from "./AssignmentsModule.js";
 import { ModuleReferentiel } from "./ReferenceModule.js";
+import { ModulePedagogique } from "./TeachingModule.js";
+import { ModuleParametres } from "./SettingsModule.js";
+import { ModuleAudit } from "./AuditModule.js";
+import { ModuleOperationnel } from "./OperationalModule.js";
 import {
   EntreeMenu,
   libellesRoles,
@@ -105,8 +110,14 @@ export function App() {
           {pageActive === "territoires" && <ModuleTerritoires />}
           {pageActive === "affectations" && <ModuleAffectations />}
           {pageActive === "referentiel" && <ModuleReferentiel />}
+          {pageActive === "pedagogie" && <ModulePedagogique utilisateur={utilisateur} />}
+          {pageActive === "parametres" && <ModuleParametres utilisateur={utilisateur} />}
+          {pageActive === "audit-exports" && <ModuleAudit utilisateur={utilisateur} />}
+          {(["progression", "fiches", "historique", "recruteurs", "evaluations-recruteurs", "progres-a-valider", "progres-ouverts", "echeances", "gestion-recruteurs"].includes(pageActive)) && <ModuleOperationnel page={pageActive} utilisateur={utilisateur} />}
+          {pageActive === "parametrage-indicateurs" && <ModuleReferentiel />}
           {pageActive === "evaluation" && (
             <Questionnaire
+              utilisateur={utilisateur}
               reponses={reponses}
               setReponses={setReponses}
               etape={etapeEvaluation}
@@ -116,9 +127,9 @@ export function App() {
           {pageActive === "resultats" && (
             etapeEvaluation === "BILAN"
               ? <Bilan reponses={reponses} modifier={() => { setEtapeEvaluation("QUESTIONNAIRE"); setPageActive("evaluation"); }} />
-              : <VueMetier entree={entreeActive} message="Aucune évaluation validée n’est disponible pour le moment." />
+              : <ModuleOperationnel page="resultats" utilisateur={utilisateur} />
           )}
-          {!(["accueil", "profil", "tableau-bord", "utilisateurs", "territoires", "affectations", "referentiel", "evaluation", "resultats"].includes(pageActive)) && (
+          {!(["accueil", "profil", "tableau-bord", "utilisateurs", "territoires", "affectations", "referentiel", "pedagogie", "parametres", "audit-exports", "evaluation", "resultats", "progression", "fiches", "historique", "recruteurs", "evaluations-recruteurs", "progres-a-valider", "progres-ouverts", "echeances", "gestion-recruteurs", "parametrage-indicateurs"].includes(pageActive)) && (
             <VueMetier entree={entreeActive} message={messageEtatVide(pageActive)} />
           )}
         </div>
@@ -356,21 +367,63 @@ function LigneProfil({ libelle, valeur }: { libelle: string; valeur: string }) {
   return <div><dt>{libelle}</dt><dd>{valeur}</dd></div>;
 }
 
-function Questionnaire({ reponses, setReponses, etape, setEtape }: {
+function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: {
+  utilisateur: UtilisateurCourant;
   reponses: Record<string, Niveau>;
   setReponses: React.Dispatch<React.SetStateAction<Record<string, Niveau>>>;
   etape: EtapeEvaluation;
   setEtape: (etape: EtapeEvaluation) => void;
 }) {
+  const [evaluationId, setEvaluationId] = useState<number | null>(null);
+  const [etatSauvegarde, setEtatSauvegarde] = useState("Chargement du brouillon…");
+  const [erreurSauvegarde, setErreurSauvegarde] = useState("");
+  const creationEnCours = useRef<Promise<number> | null>(null);
+  const derniereSauvegarde = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    let actif = true;
+    chargerSessionEvaluation(utilisateur).then((session) => {
+      if (!actif) return;
+      setEvaluationId(session.evaluationId);
+      setReponses(session.reponses);
+      setEtatSauvegarde(session.evaluationId ? "Brouillon Grist chargé" : "Le brouillon sera créé à la première réponse");
+    }).catch((erreur: unknown) => {
+      if (actif) setErreurSauvegarde(erreur instanceof Error ? erreur.message : "Le brouillon n’a pas pu être chargé.");
+    });
+    return () => { actif = false; };
+  }, [utilisateur, setReponses]);
+
+  const assurerEvaluation = async () => {
+    if (window.parent === window) return -1;
+    if (evaluationId) return evaluationId;
+    if (!creationEnCours.current) creationEnCours.current = creerEvaluation(utilisateur);
+    const id = await creationEnCours.current;
+    setEvaluationId(id);
+    return id;
+  };
+  const choisirReponse = async (code: string, niveau: Niveau) => {
+    setReponses((courantes) => ({ ...courantes, [code]: niveau }));
+    setEtatSauvegarde("Enregistrement dans Grist…"); setErreurSauvegarde("");
+    derniereSauvegarde.current = derniereSauvegarde.current.catch(() => undefined).then(async () => {
+      const id = await assurerEvaluation(); await enregistrerReponse(id, code, niveau); setEtatSauvegarde("Brouillon enregistré dans Grist");
+    });
+    try { await derniereSauvegarde.current; }
+    catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "La réponse n’a pas pu être enregistrée."); }
+  };
   if (etape === "BILAN") return <Bilan reponses={reponses} modifier={() => setEtape("QUESTIONNAIRE")} />;
   const nombreReponses = Object.keys(reponses).length;
   const nombreRestant = indicateursEvaluation.length - nombreReponses;
   const complet = nombreRestant === 0;
-  const valider = (event: FormEvent<HTMLFormElement>) => {
+  const valider = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (complet) {
-      setEtape("BILAN");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setEtatSauvegarde("Validation et création du parcours…"); setErreurSauvegarde("");
+      try {
+        await derniereSauvegarde.current;
+        const id = await assurerEvaluation();
+        await validerEvaluation(id, utilisateur);
+        setEtatSauvegarde("Évaluation validée"); setEtape("BILAN");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être validée."); }
     }
   };
   return (
@@ -383,6 +436,7 @@ function Questionnaire({ reponses, setReponses, etape, setEtape }: {
         </div>
         <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateursEvaluation.length}<span>réponses</span></p>
       </div>
+      <p className="etat-sauvegarde" aria-live="polite">{erreurSauvegarde || etatSauvegarde}</p>
       <form onSubmit={valider}>
         {axesEvaluation.map((axe, axeIndex) => (
           <section className="axe" aria-labelledby={`titre-${axe.code}`} key={axe.code}>
@@ -395,7 +449,7 @@ function Questionnaire({ reponses, setReponses, etape, setEtape }: {
                     const selectionne = reponses[indicateur.code] === choix.niveau;
                     return (
                       <label className={`option${selectionne ? " option-selectionnee" : ""}`} key={choix.niveau}>
-                        <input required type="radio" name={indicateur.code} checked={selectionne} onChange={() => setReponses((courantes) => ({ ...courantes, [indicateur.code]: choix.niveau }))} />
+                        <input required type="radio" name={indicateur.code} checked={selectionne} onChange={() => { void choisirReponse(indicateur.code, choix.niveau); }} />
                         <span className="option-contenu"><span className="option-repere">Situation {optionIndex + 1}</span>
                           {choix.criteres.length === 1 ? <span>{choix.criteres[0]}</span> : <ul>{choix.criteres.map((critere) => <li key={critere}>{critere}</li>)}</ul>}
                         </span>

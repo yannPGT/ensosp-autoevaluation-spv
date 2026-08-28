@@ -1,0 +1,65 @@
+import { obtenirDocApiGrist, TableGrist } from "./grist-context.js";
+
+export type StatutFiche = "BROUILLON" | "PUBLIEE" | "ARCHIVEE";
+export interface FichePedagogique { id:number; code:string; titre:string; description:string; perimetreId:number|null; perimetre:string; statut:StatutFiche; versionActiveId:number|null; versionActive:string; actif:boolean; versions:number; liaisons:number; }
+export interface VersionPedagogique { id:number; uid:string; ficheId:number; numero:string; attachmentId:number|null; nomFichier:string; taille:number; empreinte:string; auteur:string; estPubliee:boolean; datePublication:string; dateFin:string; }
+export interface LiaisonPedagogique { id:number; ficheId:number; indicateurId:number; indicateur:string; codeIndicateur:string; rouge:boolean; orange:boolean; actif:boolean; }
+export interface OptionPedagogique { id:number; nom:string; actif:boolean; }
+export interface DonneesPedagogiques { fiches:readonly FichePedagogique[]; versions:readonly VersionPedagogique[]; liaisons:readonly LiaisonPedagogique[]; perimetres:readonly OptionPedagogique[]; indicateurs:readonly OptionPedagogique[]; }
+export interface SaisieFiche { id?:number; code:string; titre:string; description:string; perimetreId:number; actif:boolean; }
+export interface SaisieLiaison { id?:number; ficheId:number; indicateurId:number; rouge:boolean; orange:boolean; actif:boolean; }
+export interface SaisieVersion { ficheId:number; numero:string; dateFin:string; fichier:File|null; }
+
+export async function chargerDonneesPedagogiques():Promise<DonneesPedagogiques>{
+  const api=obtenirDocApiGrist(); if(!api)return demonstration();
+  const [fiches,versions,liaisons,perimetres,indicateurs,utilisateurs]=await Promise.all([
+    api.fetchTable("FichesEnseignement"),api.fetchTable("FicheVersions"),api.fetchTable("FicheIndicateurs"),
+    api.fetchTable("Perimetres"),api.fetchTable("Indicateurs"),api.fetchTable("Utilisateurs"),
+  ]);
+  return construireDonneesPedagogiques(fiches,versions,liaisons,perimetres,indicateurs,utilisateurs);
+}
+
+export function construireDonneesPedagogiques(tf:TableGrist,tv:TableGrist,tl:TableGrist,tp:TableGrist,ti:TableGrist,tu:TableGrist):DonneesPedagogiques{
+  const perimetres=lignes(tp).map(x=>({id:n(x.id),nom:s(x.Nom)||s(x.Code),actif:b(x.Actif)})).filter(x=>x.id) as OptionPedagogique[];
+  const indicateurs=lignes(ti).map(x=>({id:n(x.id),nom:`${s(x.Code)} · ${s(x.Titre)}`,actif:b(x.Actif)})).filter(x=>x.id) as OptionPedagogique[];
+  const nomsPerimetres=new Map(perimetres.map(x=>[x.id,x.nom])); const nomsIndicateurs=new Map(indicateurs.map(x=>[x.id,x.nom]));
+  const auteurs=new Map(lignes(tu).map(x=>[n(x.id),`${s(x.Prenom)} ${s(x.Nom)}`.trim()||s(x.Email)]));
+  const versions:VersionPedagogique[]=lignes(tv).map(x=>{const id=n(x.id),ficheId=ref(x.Fiche);if(!id||!ficheId)return null;return{id,uid:s(x.Uid),ficheId,numero:s(x.NumeroVersion),attachmentId:refs(x.FichierPDF)[0]??null,nomFichier:s(x.NomFichier),taille:n(x.TailleOctets),empreinte:s(x.EmpreinteSHA256),auteur:auteurs.get(ref(x.Auteur)||0)||"Non renseigné",estPubliee:b(x.EstPubliee),datePublication:dateFr(nullable(x.DatePublication),true),dateFin:dateFr(nullable(x.DateFinValidite),false)};}).filter((x):x is VersionPedagogique=>x!==null);
+  const liaisons:LiaisonPedagogique[]=lignes(tl).map(x=>{const id=n(x.id),ficheId=ref(x.Fiche),indicateurId=ref(x.Indicateur);if(!id||!ficheId||!indicateurId)return null;const nom=nomsIndicateurs.get(indicateurId)||`Indicateur ${indicateurId}`;return{id,ficheId,indicateurId,indicateur:nom.replace(/^IND_\d+ · /,""),codeIndicateur:nom.split(" · ")[0],rouge:b(x.DeclencheRouge),orange:b(x.DeclencheOrange),actif:b(x.Actif)};}).filter((x):x is LiaisonPedagogique=>x!==null);
+  const fiches:FichePedagogique[]=lignes(tf).map(x=>{const id=n(x.id),statut=statutFiche(x.Statut);if(!id||!statut)return null;const perimetreId=ref(x.Perimetre),versionActiveId=ref(x.VersionActive);return{id,code:s(x.Code),titre:s(x.Titre),description:s(x.Description),perimetreId,perimetre:perimetreId?nomsPerimetres.get(perimetreId)||`Périmètre ${perimetreId}`:"Nationale / globale",statut,versionActiveId,versionActive:versions.find(v=>v.id===versionActiveId)?.numero||"—",actif:b(x.Actif),versions:versions.filter(v=>v.ficheId===id).length,liaisons:liaisons.filter(l=>l.ficheId===id&&l.actif).length};}).filter((x):x is FichePedagogique=>x!==null).sort((a,c)=>a.code.localeCompare(c.code,"fr"));
+  versions.sort((a,c)=>a.ficheId-c.ficheId||c.id-a.id); liaisons.sort((a,c)=>a.codeIndicateur.localeCompare(c.codeIndicateur));
+  return{fiches,versions,liaisons,perimetres:perimetres.sort(alpha),indicateurs:indicateurs.sort(alpha)};
+}
+
+export async function enregistrerFiche(x:SaisieFiche,d:DonneesPedagogiques,utilisateurId:number):Promise<void>{
+  validerFiche(x,d);const api=apiEcriture();const champs={Titre:x.titre.trim(),Description:x.description.trim(),Perimetre:x.perimetreId||null,Actif:x.actif};
+  if(x.id)await api.applyUserActions([["UpdateRecord","FichesEnseignement",x.id,champs]]);else await api.applyUserActions([["AddRecord","FichesEnseignement",null,{...champs,Code:code(x.code),Statut:"BROUILLON",CreatedBy:utilisateurId}]]);
+}
+export async function enregistrerLiaison(x:SaisieLiaison,d:DonneesPedagogiques):Promise<void>{validerLiaison(x,d);const api=apiEcriture();const champs={DeclencheRouge:x.rouge,DeclencheOrange:x.orange,Actif:x.actif};await api.applyUserActions([x.id?["UpdateRecord","FicheIndicateurs",x.id,champs]:["AddRecord","FicheIndicateurs",null,{...champs,Fiche:x.ficheId,Indicateur:x.indicateurId}]]);}
+export async function ajouterVersion(x:SaisieVersion,d:DonneesPedagogiques,utilisateurId:number,maxMo=10):Promise<void>{
+  validerVersion(x,d,maxMo);const fichier=x.fichier as File;const api=apiEcriture();if(!api.getAccessToken)throw new Error("Cette version de l’API Grist ne permet pas le dépôt de pièces jointes.");
+  const jeton=await api.getAccessToken({readOnly:false});const formulaire=new FormData();formulaire.append("upload",fichier,fichier.name);
+  const reponse=await fetch(`${jeton.baseUrl}/attachments?auth=${encodeURIComponent(jeton.token)}`,{method:"POST",body:formulaire});if(!reponse.ok)throw new Error(`Le PDF n’a pas pu être déposé dans Grist (${reponse.status}).`);
+  const ids=await reponse.json() as unknown;if(!Array.isArray(ids)||typeof ids[0]!=="number")throw new Error("Grist n’a retourné aucun identifiant de pièce jointe.");
+  const fiche=d.fiches.find(f=>f.id===x.ficheId);const empreinte=await sha256(fichier);await api.applyUserActions([["AddRecord","FicheVersions",null,{Uid:crypto.randomUUID(),Fiche:x.ficheId,NumeroVersion:x.numero.trim(),FichierPDF:["L",ids[0]],NomFichier:fichier.name,TailleOctets:fichier.size,EmpreinteSHA256:empreinte,Auteur:utilisateurId,Perimetre:fiche?.perimetreId||null,EstPubliee:false,DateFinValidite:x.dateFin?dateTimestamp(x.dateFin):null}]]);
+}
+export async function publierVersion(ficheId:number,versionId:number,d:DonneesPedagogiques):Promise<void>{
+  const fiche=d.fiches.find(f=>f.id===ficheId),version=d.versions.find(v=>v.id===versionId&&v.ficheId===ficheId);if(!fiche||!version)throw new Error("La fiche ou la version est introuvable.");if(fiche.statut==="ARCHIVEE")throw new Error("Une fiche archivée ne peut plus être publiée.");if(version.estPubliee&&fiche.versionActiveId===version.id)return;if(!version.attachmentId)throw new Error("La version ne contient aucun PDF.");if(!d.liaisons.some(l=>l.ficheId===ficheId&&l.actif&&(l.rouge||l.orange)))throw new Error("Ajoutez au moins une liaison active avant publication.");
+  await apiEcriture().applyUserActions([["UpdateRecord","FicheVersions",version.id,{EstPubliee:true,DatePublication:maintenant()}],["UpdateRecord","FichesEnseignement",fiche.id,{VersionActive:version.id,Statut:"PUBLIEE",Actif:true}]]);
+}
+export async function archiverFiche(ficheId:number,d:DonneesPedagogiques):Promise<void>{const fiche=d.fiches.find(f=>f.id===ficheId);if(!fiche||fiche.statut!=="PUBLIEE")throw new Error("Seule une fiche publiée peut être archivée.");await apiEcriture().applyUserActions([["UpdateRecord","FichesEnseignement",fiche.id,{Statut:"ARCHIVEE",Actif:false}]]);}
+export async function urlVersion(version:VersionPedagogique):Promise<string>{if(!version.attachmentId)throw new Error("Aucun PDF n’est associé à cette version.");const api=apiEcriture();if(!api.getAccessToken)throw new Error("Le téléchargement n’est pas disponible avec cette version de Grist.");const jeton=await api.getAccessToken({readOnly:true});return`${jeton.baseUrl}/attachments/${version.attachmentId}/download?auth=${encodeURIComponent(jeton.token)}`;}
+
+export function validerFiche(x:SaisieFiche,d:DonneesPedagogiques):void{const c=code(x.code);if(!/^FICHE_[A-Z0-9_]{2,40}$/.test(c)||!x.titre.trim())throw new Error("Le code FICHE_... et le titre sont obligatoires.");if(d.fiches.some(f=>f.id!==x.id&&f.code.toUpperCase()===c))throw new Error("Ce code de fiche existe déjà.");if(x.perimetreId&&!d.perimetres.find(p=>p.id===x.perimetreId)?.actif)throw new Error("Sélectionnez un périmètre actif.");}
+export function validerLiaison(x:SaisieLiaison,d:DonneesPedagogiques):void{if(!d.fiches.find(f=>f.id===x.ficheId)||!d.indicateurs.find(i=>i.id===x.indicateurId))throw new Error("La fiche et l’indicateur sont obligatoires.");if(x.actif&&!x.rouge&&!x.orange)throw new Error("Une liaison active doit déclencher le niveau rouge ou orange.");if(d.liaisons.some(l=>l.id!==x.id&&l.ficheId===x.ficheId&&l.indicateurId===x.indicateurId))throw new Error("Cet indicateur est déjà lié à la fiche.");}
+export function validerVersion(x:SaisieVersion,d:DonneesPedagogiques,maxMo=10):void{const fiche=d.fiches.find(f=>f.id===x.ficheId);if(!fiche||fiche.statut==="ARCHIVEE")throw new Error("Sélectionnez une fiche non archivée.");if(!/^\d+\.\d+$/.test(x.numero.trim()))throw new Error("Le numéro de version doit suivre le format 1.0.");if(d.versions.some(v=>v.ficheId===x.ficheId&&v.numero===x.numero.trim()))throw new Error("Ce numéro de version existe déjà pour cette fiche.");if(!x.fichier)throw new Error("Sélectionnez un fichier PDF.");if(x.fichier.type!=="application/pdf"&&!x.fichier.name.toLowerCase().endsWith(".pdf"))throw new Error("Le fichier doit être un PDF.");if(!x.fichier.name.toLowerCase().endsWith(".pdf"))throw new Error("L’extension du fichier doit être .pdf.");if(x.fichier.size<=0||x.fichier.size>maxMo*1024*1024)throw new Error(`Le PDF doit peser moins de ${maxMo} Mo.`);if(x.dateFin&&!dateTimestamp(x.dateFin))throw new Error("La date de fin de validité est incorrecte.");}
+
+function demonstration():DonneesPedagogiques{return construireDonneesPedagogiques({id:[1],Code:["FICHE_IND_01"],Titre:["Réussir le premier contact"],Description:["Repères pratiques pour organiser une prise de contact rapide."],Perimetre:[null],Statut:["BROUILLON"],VersionActive:[null],Actif:[true]},{id:[2],Uid:["demo-version"],Fiche:[1],NumeroVersion:["1.0"],FichierPDF:[["L",101]],NomFichier:["premier-contact.pdf"],TailleOctets:[245000],EmpreinteSHA256:["demo"],Auteur:[7],EstPubliee:[false],DatePublication:[null],DateFinValidite:[null]},{id:[3],Fiche:[1],Indicateur:[11],DeclencheRouge:[true],DeclencheOrange:[true],Actif:[true]},{id:[4],Nom:["Périmètre national"],Actif:[true]},{id:[11],Code:["IND_01"],Titre:["Délai du premier contact"],Actif:[true]},{id:[7],Prenom:["Yann"],Nom:["Administrateur"]});}
+function apiEcriture(){const api=obtenirDocApiGrist();if(!api)throw new Error("Cette opération est disponible uniquement depuis le widget Grist.");return api;}
+async function sha256(file:File){const hash=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());return Array.from(new Uint8Array(hash)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+function lignes(t:TableGrist){return(t.id??[]).map((_,i)=>Object.fromEntries(Object.entries(t).map(([k,v])=>[k,v[i]])))}
+function refs(v:unknown):number[]{if(!Array.isArray(v))return[];return v.filter((x):x is number=>typeof x==="number"&&x>0)}function ref(v:unknown){return typeof v==="number"&&v>0?v:refs(v).at(-1)??null}
+function statutFiche(v:unknown):StatutFiche|null{const x=s(v).toUpperCase();return x==="BROUILLON"||x==="PUBLIEE"||x==="ARCHIVEE"?x:null}function code(v:string){return v.trim().toUpperCase().replace(/[\s-]+/g,"_")}
+function dateTimestamp(v:string){if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const ms=Date.parse(`${v}T00:00:00Z`);return Number.isFinite(ms)?Math.floor(ms/1000):null}function maintenant(){return Math.floor(Date.now()/1000)}
+function dateFr(v:number|null,heure:boolean){return v?new Intl.DateTimeFormat("fr-FR",heure?{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/Paris"}:{dateStyle:"medium",timeZone:"UTC"}).format(new Date(v*1000)):"—"}function nullable(v:unknown){const x=n(v);return x||null}
+function alpha(a:OptionPedagogique,c:OptionPedagogique){return a.nom.localeCompare(c.nom,"fr")}function n(v:unknown){return typeof v==="number"&&Number.isFinite(v)?v:0}function s(v:unknown){return typeof v==="string"?v:""}function b(v:unknown){return v===true||v===1}
