@@ -18,7 +18,7 @@ import {
   UtilisateurCourant,
 } from "./portal-data.js";
 
-type EtapeEvaluation = "QUESTIONNAIRE" | "BILAN";
+type EtapeEvaluation = "QUESTIONNAIRE" | "FINALISEE" | "BILAN";
 type EtatTableauDeBord =
   | { statut: "chargement" }
   | { statut: "pret"; tableau: TableauDeBord }
@@ -141,7 +141,7 @@ export function App() {
 function EcranConnexion({ titre, message, reessayer }: { titre: string; message: string; reessayer?: () => void }) {
   return (
     <main>
-      <header><p className="marque">ENSOSPP</p><h1>Auto-évaluation des pratiques de recrutement SPV</h1></header>
+      <header><p className="marque">ENSOSP</p><h1>Auto-évaluation des pratiques de recrutement SPV</h1></header>
       <section className="page-carte ecran-connexion" aria-live="polite">
         <p className="surtitre">Identification sécurisée</p><h2>{titre}</h2><p>{message}</p>
         {reessayer && <button type="button" onClick={reessayer}>Réessayer</button>}
@@ -154,7 +154,7 @@ function Bandeau({ utilisateur }: { utilisateur: UtilisateurCourant }) {
   return (
     <header>
       <span className="badge-beta">Bêta</span>
-      <p className="marque">ENSOSPP <span>· {utilisateur.prenom} {utilisateur.nom}</span></p>
+      <p className="marque">ENSOSP <span>· {utilisateur.prenom} {utilisateur.nom}</span></p>
       <h1>Auto-évaluation des pratiques de recrutement SPV</h1>
       <div className="contexte-utilisateur" aria-label="Informations de l’utilisateur connecté">
         <span>{libellesRoles[utilisateur.role]}</span>
@@ -377,6 +377,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   const [evaluationId, setEvaluationId] = useState<number | null>(null);
   const [etatSauvegarde, setEtatSauvegarde] = useState("Chargement du brouillon…");
   const [erreurSauvegarde, setErreurSauvegarde] = useState("");
+  const [operationEvaluation, setOperationEvaluation] = useState(false);
   const creationEnCours = useRef<Promise<number> | null>(null);
   const derniereSauvegarde = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
@@ -404,26 +405,46 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     setReponses((courantes) => ({ ...courantes, [code]: niveau }));
     setEtatSauvegarde("Enregistrement dans Grist…"); setErreurSauvegarde("");
     derniereSauvegarde.current = derniereSauvegarde.current.catch(() => undefined).then(async () => {
-      const id = await assurerEvaluation(); await enregistrerReponse(id, code, niveau); setEtatSauvegarde("Brouillon enregistré dans Grist");
+      const id = await assurerEvaluation(); if (id !== -1) await enregistrerReponse(id, code, niveau); setEtatSauvegarde("Brouillon enregistré dans Grist");
     });
     try { await derniereSauvegarde.current; }
     catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "La réponse n’a pas pu être enregistrée."); }
   };
   if (etape === "BILAN") return <Bilan reponses={reponses} modifier={() => setEtape("QUESTIONNAIRE")} />;
+  if (etape === "FINALISEE") return (
+    <section className="page-carte confirmation-evaluation" aria-labelledby="evaluation-finalisee">
+      <p className="surtitre">Évaluation enregistrée</p>
+      <h2 id="evaluation-finalisee">Votre évaluation est finalisée</h2>
+      <p>Vos réponses sont désormais validées et votre parcours de progression a été créé. Elles ne peuvent plus être modifiées.</p>
+      <button type="button" onClick={() => { setEtape("BILAN"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Voir mon bilan</button>
+    </section>
+  );
   const nombreReponses = Object.keys(reponses).length;
   const nombreRestant = indicateursEvaluation.length - nombreReponses;
   const complet = nombreRestant === 0;
+  const enregistrerBrouillon = async () => {
+    setOperationEvaluation(true); setEtatSauvegarde("Enregistrement du brouillon…"); setErreurSauvegarde("");
+    try {
+      await derniereSauvegarde.current;
+      await assurerEvaluation();
+      setEtatSauvegarde("Votre évaluation est enregistrée. Vous pourrez la reprendre ultérieurement.");
+    } catch (erreur) {
+      setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être enregistrée.");
+    } finally { setOperationEvaluation(false); }
+  };
   const valider = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (complet) {
+      setOperationEvaluation(true);
       setEtatSauvegarde("Validation et création du parcours…"); setErreurSauvegarde("");
       try {
         await derniereSauvegarde.current;
         const id = await assurerEvaluation();
-        await validerEvaluation(id, utilisateur);
-        setEtatSauvegarde("Évaluation validée"); setEtape("BILAN");
+        if (id !== -1) await validerEvaluation(id, utilisateur);
+        setEtatSauvegarde("Évaluation validée"); setEtape("FINALISEE");
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être validée."); }
+      finally { setOperationEvaluation(false); }
     }
   };
   return (
@@ -462,8 +483,11 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
           </section>
         ))}
         <div className="actions-formulaire">
-          <p>{complet ? "Toutes les réponses sont renseignées." : `${nombreRestant} indicateur${nombreRestant > 1 ? "s" : ""} restant${nombreRestant > 1 ? "s" : ""}.`}</p>
-          <button type="submit" disabled={!complet}>Afficher mon bilan</button>
+          <p>{complet ? "Toutes les réponses sont renseignées. Vous pouvez maintenant valider définitivement votre évaluation." : `${nombreRestant} indicateur${nombreRestant > 1 ? "s" : ""} restant${nombreRestant > 1 ? "s" : ""}.`}</p>
+          <div className="boutons-evaluation">
+            <button className="bouton-secondaire" type="button" onClick={() => { void enregistrerBrouillon(); }} disabled={operationEvaluation || nombreReponses === 0}>Enregistrer mon évaluation</button>
+            <button type="submit" disabled={!complet || operationEvaluation}>{operationEvaluation && complet ? "Validation…" : "Valider mon évaluation"}</button>
+          </div>
         </div>
       </form>
     </section>
