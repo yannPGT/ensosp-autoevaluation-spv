@@ -126,7 +126,7 @@ export function App() {
           )}
           {pageActive === "resultats" && (
             etapeEvaluation === "BILAN"
-              ? <Bilan reponses={reponses} modifier={() => { setEtapeEvaluation("QUESTIONNAIRE"); setPageActive("evaluation"); }} />
+              ? <Bilan reponses={reponses} modifier={() => { setEtapeEvaluation("FINALISEE"); setPageActive("evaluation"); }} />
               : <ModuleOperationnel page="resultats" utilisateur={utilisateur} />
           )}
           {!(["accueil", "profil", "tableau-bord", "utilisateurs", "territoires", "affectations", "referentiel", "pedagogie", "parametres", "audit-exports", "evaluation", "resultats", "progression", "fiches", "historique", "recruteurs", "evaluations-recruteurs", "progres-a-valider", "progres-ouverts", "echeances", "gestion-recruteurs", "parametrage-indicateurs"].includes(pageActive)) && (
@@ -159,6 +159,7 @@ function Bandeau({ utilisateur }: { utilisateur: UtilisateurCourant }) {
       <div className="contexte-utilisateur" aria-label="Informations de l’utilisateur connecté">
         <span>{libellesRoles[utilisateur.role]}</span>
         <span>{utilisateur.perimetrePrincipal}</span>
+        {utilisateur.role === "RECRUTEUR" && <span>Superviseur : {utilisateur.superviseurNom}</span>}
       </div>
       <p>13 indicateurs · 3 axes · vos données restent protégées par Grist</p>
       <p className="version-widget">Version 1.0 · © YannPGT</p>
@@ -344,6 +345,7 @@ function Profil({ utilisateur }: { utilisateur: UtilisateurCourant }) {
         <BlocProfil titre="Organisation">
           <LigneProfil libelle="Entité" valeur={utilisateur.entite} />
           <LigneProfil libelle="Périmètre principal" valeur={utilisateur.perimetrePrincipal} />
+          {utilisateur.role === "RECRUTEUR" && <LigneProfil libelle="Superviseur" valeur={utilisateur.superviseurNom} />}
           <LigneProfil
             libelle="Périmètres supervisés"
             valeur={utilisateur.perimetresSupervises.length ? utilisateur.perimetresSupervises.join(" · ") : "Aucun"}
@@ -381,6 +383,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   const [operationEvaluation, setOperationEvaluation] = useState(false);
   const creationEnCours = useRef<Promise<number> | null>(null);
   const derniereSauvegarde = useRef<Promise<void>>(Promise.resolve());
+
   useEffect(() => {
     let actif = true;
     chargerSessionEvaluation(utilisateur).then((session) => {
@@ -408,43 +411,49 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     setEvaluationId(id);
     return id;
   };
+
   const choisirReponse = async (code: string, niveau: Niveau) => {
     setReponses((courantes) => ({ ...courantes, [code]: niveau }));
-    setEtatSauvegarde("Enregistrement dans Grist…"); setErreurSauvegarde("");
+    setEtatSauvegarde("Enregistrement dans Grist…");
+    setErreurSauvegarde("");
     derniereSauvegarde.current = derniereSauvegarde.current.catch(() => undefined).then(async () => {
-      const id = await assurerEvaluation(); if (id !== -1) await enregistrerReponse(id, code, niveau); setEtatSauvegarde("Brouillon enregistré dans Grist");
+      const id = await assurerEvaluation();
+      if (id !== -1) await enregistrerReponse(id, code, niveau);
+      setEtatSauvegarde("Brouillon enregistré dans Grist");
     });
     try { await derniereSauvegarde.current; }
     catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "La réponse n’a pas pu être enregistrée."); }
   };
-  if (etape === "BILAN") return <Bilan reponses={reponses} modifier={() => setEtape("QUESTIONNAIRE")} />;
-  if (etape === "FINALISEE") return (
-    <section className="page-carte confirmation-evaluation" aria-labelledby="evaluation-finalisee">
-      <p className="surtitre">Évaluation enregistrée</p>
-      <h2 id="evaluation-finalisee">Votre évaluation est finalisée</h2>
-      <p>{avertissementFinalisation ? "Vos réponses sont désormais validées et ne peuvent plus être modifiées." : "Vos réponses sont désormais validées et votre parcours de progression a été créé. Elles ne peuvent plus être modifiées."}</p>
-      {avertissementFinalisation && <p className="message-formulaire message-avertissement" role="status">{avertissementFinalisation}</p>}
-      <div className="actions-formulaire">
-        <button type="button" onClick={() => { setEtape("BILAN"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Voir mon bilan</button>
-        <button type="button" className="bouton-secondaire" onClick={() => {
-          setEvaluationId(null);
-          creationEnCours.current = null;
-          derniereSauvegarde.current = Promise.resolve();
-          setReponses({});
-          setAvertissementFinalisation("");
-          setErreurSauvegarde("");
-          setEtatSauvegarde("Nouvelle auto-évaluation : le brouillon sera créé à la première réponse");
-          setEtape("QUESTIONNAIRE");
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}>Commencer une nouvelle auto-évaluation</button>
-      </div>
-    </section>
-  );
+
+  if (etape === "BILAN") return <Bilan reponses={reponses} modifier={() => setEtape("FINALISEE")} />;
+  if (etape === "FINALISEE") {
+    const contact = utilisateur.superviseurNom && utilisateur.superviseurNom !== "Non renseigné"
+      ? utilisateur.superviseurNom
+      : "votre superviseur";
+    return (
+      <section className="page-carte confirmation-evaluation" aria-labelledby="evaluation-finalisee">
+        <p className="surtitre">Évaluation enregistrée</p>
+        <h2 id="evaluation-finalisee">Votre évaluation est validée et verrouillée</h2>
+        <p>{avertissementFinalisation ? "Vos réponses sont désormais validées et ne peuvent plus être modifiées." : "Vos réponses sont désormais validées et votre parcours de progression a été créé. Elles ne peuvent plus être modifiées."}</p>
+        <p className="message-formulaire" role="status">
+          Seul votre superviseur peut autoriser une nouvelle auto-évaluation. Si vous souhaitez en réaliser une nouvelle, contactez {contact}.
+        </p>
+        {avertissementFinalisation && <p className="message-formulaire message-avertissement" role="status">{avertissementFinalisation}</p>}
+        <div className="actions-formulaire">
+          <button type="button" onClick={() => { setEtape("BILAN"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Voir mon bilan</button>
+        </div>
+      </section>
+    );
+  }
+
   const nombreReponses = Object.keys(reponses).length;
   const nombreRestant = indicateursEvaluation.length - nombreReponses;
   const complet = nombreRestant === 0;
+
   const enregistrerBrouillon = async () => {
-    setOperationEvaluation(true); setEtatSauvegarde("Enregistrement du brouillon…"); setErreurSauvegarde("");
+    setOperationEvaluation(true);
+    setEtatSauvegarde("Enregistrement du brouillon…");
+    setErreurSauvegarde("");
     try {
       await derniereSauvegarde.current;
       await assurerEvaluation();
@@ -453,11 +462,13 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
       setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être enregistrée.");
     } finally { setOperationEvaluation(false); }
   };
+
   const valider = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (complet) {
       setOperationEvaluation(true);
-      setEtatSauvegarde("Validation et création du parcours…"); setErreurSauvegarde("");
+      setEtatSauvegarde("Validation et création du parcours…");
+      setErreurSauvegarde("");
       try {
         await derniereSauvegarde.current;
         const id = await assurerEvaluation();
@@ -465,12 +476,15 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
           const resultat = await validerEvaluation(id, utilisateur);
           setAvertissementFinalisation(resultat.avertissement ?? "");
         }
-        setEtatSauvegarde("Évaluation validée"); setEtape("FINALISEE");
+        setEtatSauvegarde("Évaluation validée");
+        setEtape("FINALISEE");
         window.scrollTo({ top: 0, behavior: "smooth" });
-      } catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être validée."); }
-      finally { setOperationEvaluation(false); }
+      } catch (erreur) {
+        setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être validée.");
+      } finally { setOperationEvaluation(false); }
     }
   };
+
   return (
     <section className="page-carte" aria-labelledby="questionnaire">
       <div className="section-intro">
@@ -531,7 +545,7 @@ function Bilan({ reponses, modifier }: { reponses: Record<string, Niveau>; modif
           return <article key={indicateur.code}><div><strong>{indicateur.titre}</strong><span>{niveau ? libellesNiveaux[niveau] : "Non renseigné"}</span></div><b>{niveau ?? "—"}</b></article>;
         })}
       </div>
-      <button type="button" onClick={modifier}>Retour au questionnaire</button>
+      <button type="button" onClick={modifier}>Retour à mon évaluation</button>
     </section>
   );
 }
