@@ -8,6 +8,7 @@ export interface SessionEvaluation {
   evaluationId: number | null;
   reponses: Record<string, Niveau>;
   statut: StatutSessionEvaluation;
+  verrouillee: boolean;
 }
 
 export interface ResultatValidation {
@@ -16,12 +17,13 @@ export interface ResultatValidation {
 
 export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant): Promise<SessionEvaluation> {
   const api = obtenirDocApiGrist();
-  if (!api) return { evaluationId: null, reponses: {}, statut: null };
+  if (!api) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false };
 
-  const [evaluations, reponses, indicateurs] = await Promise.all([
+  const [evaluations, reponses, indicateurs, utilisateurs] = await Promise.all([
     api.fetchTable("Evaluations"),
     api.fetchTable("Reponses"),
     api.fetchTable("Indicateurs"),
+    api.fetchTable("Utilisateurs"),
   ]);
 
   const candidats = (evaluations.id ?? [])
@@ -30,6 +32,7 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
       id: nombre(v),
       recruteur: referenceId(evaluations.Recruteur?.[i]),
       statut: texte(evaluations.Statut?.[i]),
+      dateValidation: nombre(evaluations.DateValidation?.[i]) ?? nombre(evaluations.UpdatedAt?.[i]) ?? 0,
     }))
     .filter((e) => e.id && e.recruteur === utilisateur.id);
 
@@ -38,10 +41,18 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
     .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
   const validee = candidats
     .filter((e) => e.statut === "VALIDEE")
-    .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
-  const cible = brouillon ?? validee;
+    .sort((a, b) => b.dateValidation - a.dateValidation || (b.id ?? 0) - (a.id ?? 0))[0];
 
-  if (!cible?.id) return { evaluationId: null, reponses: {}, statut: null };
+  const ui = (utilisateurs.id ?? []).findIndex((v) => nombre(v) === utilisateur.id);
+  const dateDeblocage = ui >= 0 ? nombre(utilisateurs.DateDeblocageEvaluation?.[ui]) ?? 0 : 0;
+  const nouvelleEvaluationAutorisee = Boolean(validee && dateDeblocage > validee.dateValidation);
+
+  if (!brouillon && nouvelleEvaluationAutorisee) {
+    return { evaluationId: null, reponses: {}, statut: null, verrouillee: false };
+  }
+
+  const cible = brouillon ?? validee;
+  if (!cible?.id) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false };
 
   const evaluationId = cible.id;
   const codes = new Map<number, string>();
@@ -58,10 +69,12 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
     if (code && niveau) resultat[code] = niveau;
   });
 
+  const statut = cible.statut === "BROUILLON" ? "BROUILLON" : "VALIDEE";
   return {
     evaluationId,
     reponses: resultat,
-    statut: cible.statut === "BROUILLON" ? "BROUILLON" : "VALIDEE",
+    statut,
+    verrouillee: statut === "VALIDEE",
   };
 }
 
@@ -83,24 +96,34 @@ export async function creerEvaluation(utilisateur: UtilisateurCourant): Promise<
   );
   const campagne = campagneIndex >= 0 ? nombre(campagnes.id?.[campagneIndex]) : null;
 
-  const brouillonExistant = (evaluationsExistantes.id ?? [])
+  const evaluationsUtilisateur = (evaluationsExistantes.id ?? [])
     .map((v, i) => ({
       id: nombre(v),
       recruteur: referenceId(evaluationsExistantes.Recruteur?.[i]),
       perimetre: referenceId(evaluationsExistantes.Perimetre?.[i]),
       campagne: referenceId(evaluationsExistantes.Campagne?.[i]),
       statut: texte(evaluationsExistantes.Statut?.[i]),
+      dateValidation: nombre(evaluationsExistantes.DateValidation?.[i]) ?? nombre(evaluationsExistantes.UpdatedAt?.[i]) ?? 0,
     }))
+    .filter((evaluation) => evaluation.id && evaluation.recruteur === utilisateur.id);
+
+  const brouillonExistant = evaluationsUtilisateur
     .filter((evaluation) =>
-      evaluation.id
-      && evaluation.recruteur === utilisateur.id
-      && evaluation.perimetre === perimetre
+      evaluation.perimetre === perimetre
       && evaluation.campagne === campagne
       && evaluation.statut === "BROUILLON"
     )
     .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
 
   if (brouillonExistant?.id) return brouillonExistant.id;
+
+  const derniereValidee = evaluationsUtilisateur
+    .filter((evaluation) => evaluation.statut === "VALIDEE")
+    .sort((a, b) => b.dateValidation - a.dateValidation || (b.id ?? 0) - (a.id ?? 0))[0];
+  const dateDeblocage = ui >= 0 ? nombre(utilisateurs.DateDeblocageEvaluation?.[ui]) ?? 0 : 0;
+  if (derniereValidee && dateDeblocage <= derniereValidee.dateValidation) {
+    throw new Error("Votre auto-évaluation est verrouillée après validation. Seul votre superviseur peut autoriser une nouvelle auto-évaluation ; contactez-le si nécessaire.");
+  }
 
   const uid = crypto.randomUUID();
   await api.applyUserActions([["AddRecord", "Evaluations", null, {
