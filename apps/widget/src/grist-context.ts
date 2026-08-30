@@ -52,7 +52,7 @@ export async function chargerUtilisateurCourant(): Promise<UtilisateurCourant> {
       grist.docApi.fetchTable("Utilisateurs"),
       grist.docApi.fetchTable("Entites"),
       grist.docApi.fetchTable("Perimetres"),
-      grist.docApi.fetchTable("AffectationsSuperviseurs"),
+      grist.docApi.fetchTable("AffectationsSuperviseurs").catch(() => ({} as TableGrist)),
     ]);
 
     return construireUtilisateur(utilisateurId, utilisateurs, entites, perimetres, affectationsSuperviseurs);
