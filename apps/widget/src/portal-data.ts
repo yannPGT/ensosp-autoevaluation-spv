@@ -9,6 +9,7 @@ export interface UtilisateurCourant {
   entite: string;
   perimetrePrincipal: string;
   perimetresSupervises: readonly string[];
+  superviseurNom: string;
   peutGererPedagogie: boolean;
   actif: boolean;
 }
@@ -79,6 +80,7 @@ const profilsDemonstration: Record<RoleUtilisateur, UtilisateurCourant> = {
     entite: "ENSOSPP",
     perimetrePrincipal: "Périmètre national",
     perimetresSupervises: [],
+    superviseurNom: "—",
     peutGererPedagogie: true,
     actif: true,
   },
@@ -91,6 +93,7 @@ const profilsDemonstration: Record<RoleUtilisateur, UtilisateurCourant> = {
     entite: "SDIS de la Gironde",
     perimetrePrincipal: "SDIS 33 groupement NORD",
     perimetresSupervises: ["SDIS 33 groupement NORD"],
+    superviseurNom: "—",
     peutGererPedagogie: true,
     actif: true,
   },
@@ -103,6 +106,7 @@ const profilsDemonstration: Record<RoleUtilisateur, UtilisateurCourant> = {
     entite: "SDIS de la Gironde",
     perimetrePrincipal: "SDIS 33 groupement NORD",
     perimetresSupervises: [],
+    superviseurNom: "Camille BERNARD",
     peutGererPedagogie: false,
     actif: true,
   },
