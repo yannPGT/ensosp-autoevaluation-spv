@@ -488,12 +488,11 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
             {axe.indicateurs.map((indicateur) => (
               <fieldset key={indicateur.code}>
                 <legend>{indicateur.titre}</legend>
-                <p>{indicateur.description}</p>
                 <div className="choix-niveaux">
-                  {indicateur.criteres.map((critere) => (
-                    <label className={reponses[indicateur.code] === critere.niveau ? "choix-niveau choix-selectionne" : "choix-niveau"} key={critere.niveau}>
-                      <input type="radio" name={indicateur.code} value={critere.niveau} checked={reponses[indicateur.code] === critere.niveau} onChange={() => choisirReponse(indicateur.code, critere.niveau)} />
-                      <span>{critere.libelle}</span>
+                  {indicateur.options.map((option) => (
+                    <label className={reponses[indicateur.code] === option.niveau ? "choix-niveau choix-selectionne" : "choix-niveau"} key={option.niveau}>
+                      <input type="radio" name={indicateur.code} value={option.niveau} checked={reponses[indicateur.code] === option.niveau} onChange={() => choisirReponse(indicateur.code, option.niveau)} />
+                      <span>{option.criteres.join(" · ")}</span>
                     </label>
                   ))}
                 </div>
