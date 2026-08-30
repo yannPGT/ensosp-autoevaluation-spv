@@ -3,7 +3,7 @@
   "tables": [
     {"id":"Entites","columns":[["Code","Text"],["Nom","Text"],["Parent","Ref:Entites"],["Actif","Bool"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
     {"id":"Perimetres","columns":[["Code","Text"],["Nom","Text"],["Entite","Ref:Entites"],["Actif","Bool"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
-    {"id":"Utilisateurs","columns":[["Email","Text"],["Nom","Text"],["Prenom","Text"],["Role","Choice"],["PeutGererPedagogie","Bool"],["Entite","Ref:Entites"],["PerimetrePrincipal","Ref:Perimetres"],["PerimetresSupervises","RefList:Perimetres"],["Actif","Bool"],["DateActivation","Date"],["DateDesactivation","Date"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
+    {"id":"Utilisateurs","columns":[["Email","Text"],["Nom","Text"],["Prenom","Text"],["Role","Choice"],["PeutGererPedagogie","Bool"],["Entite","Ref:Entites"],["PerimetrePrincipal","Ref:Perimetres"],["PerimetresSupervises","RefList:Perimetres"],["DateDeblocageEvaluation","DateTime"],["Actif","Bool"],["DateActivation","Date"],["DateDesactivation","Date"],["CreatedAt","DateTime"],["UpdatedAt","DateTime"]]},
     {"id":"AffectationsSuperviseurs","columns":[["Superviseur","Ref:Utilisateurs"],["Perimetre","Ref:Perimetres"],["DateDebut","Date"],["DateFin","Date"],["Actif","Bool"],["CreatedAt","DateTime"],["CreatedByEmail","Text"]]},
     {"id":"Axes","columns":[["Code","Text"],["Ordre","Int"],["Titre","Text"],["Description","Text"],["Actif","Bool"]]},
     {"id":"Indicateurs","columns":[["Code","Text"],["Axe","Ref:Axes"],["Ordre","Int"],["Titre","Text"],["Description","Text"],["Obligatoire","Bool"],["Actif","Bool"]]},
@@ -23,4 +23,3 @@
     {"id":"Parametres","columns":[["Cle","Text"],["Valeur","Text"],["Description","Text"],["UpdatedAt","DateTime"],["UpdatedByEmail","Text"]]}
   ]
 }
-
