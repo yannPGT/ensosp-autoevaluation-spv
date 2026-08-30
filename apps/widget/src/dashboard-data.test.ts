@@ -11,6 +11,7 @@ const baseUtilisateur: UtilisateurCourant = {
   entite: "SDIS de test",
   perimetrePrincipal: "Groupement Nord",
   perimetresSupervises: [],
+  superviseurNom: "Camille BERNARD",
   peutGererPedagogie: false,
   actif: true,
 };
