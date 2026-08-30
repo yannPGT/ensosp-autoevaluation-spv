@@ -86,7 +86,7 @@ function tableauRecruteur(utilisateur: UtilisateurCourant, tables: Record<string
         detail: "Demandes transmises au superviseur",
       },
     ],
-    repartition: repartitionNiveaux(reponses),
+    repartition: repartitionNiveauxCourants(reponses, actions),
     titreSuivi: "Mes prochaines actions",
     lignes: actionsOuvertes
       .sort((a, b) => temps(a.Echeance) - temps(b.Echeance))
@@ -97,7 +97,7 @@ function tableauRecruteur(utilisateur: UtilisateurCourant, tables: Record<string
         valeur: choix(ligne.NiveauCourant) || choix(ligne.NiveauInitial),
       })),
     personnel: [],
-    note: "La répartition correspond à votre dernière évaluation validée. Elle ne constitue pas une note globale.",
+    note: "La répartition affiche le niveau courant de vos 13 indicateurs. L’évaluation initiale reste conservée dans l’historique.",
   };
 }
 
@@ -108,7 +108,8 @@ function tableauSuperviseur(tables: Record<string, TableGrist>): TableauDeBord {
   const dernieres = dernieresEvaluationsValidees(evaluations);
   const idsEvaluations = new Set(dernieres.map((ligne) => nombre(ligne.id)).filter((id): id is number => Boolean(id)));
   const reponses = lignes(tables.Reponses).filter((ligne) => idsEvaluations.has(ref(ligne.Evaluation) ?? 0));
-  const actionsOuvertes = lignes(tables.ActionsProgres).filter(actionOuverte);
+  const actions = lignes(tables.ActionsProgres);
+  const actionsOuvertes = actions.filter(actionOuverte);
   const taux = recruteurs.length ? Math.round((dernieres.length / recruteurs.length) * 100) : 0;
   const personnel = construirePersonnel(recruteurs, dernieres, actionsOuvertes, lignes(tables.Perimetres));
 
@@ -125,20 +126,20 @@ function tableauSuperviseur(tables: Record<string, TableGrist>): TableauDeBord {
       { valeur: String(actionsOuvertes.filter(estEnRetard).length), libelle: "Échéances dépassées", detail: "Actions ouvertes en retard" },
       { valeur: String(dernieres.length), libelle: "Bilans disponibles", detail: "Dernières évaluations validées" },
     ],
-    repartition: repartitionNiveaux(reponses),
+    repartition: repartitionNiveauxCourants(reponses, actions),
     titreSuivi: "Progression individuelle",
     lignes: recruteurs.slice(0, 8).map((recruteur) => {
       const recruteurId = nombre(recruteur.id);
       const evaluation = dernieres.find((ligne) => ref(ligne.Recruteur) === recruteurId);
-      const actions = actionsOuvertes.filter((ligne) => ref(ligne.Recruteur) === recruteurId);
+      const actionsRecruteur = actionsOuvertes.filter((ligne) => ref(ligne.Recruteur) === recruteurId);
       return {
         titre: `${texte(recruteur.Prenom)} ${texte(recruteur.Nom)}`.trim() || texte(recruteur.Email),
         detail: evaluation ? `Dernière évaluation : ${dateFr(evaluation.DateValidation)}` : "Aucune évaluation validée",
-        valeur: `${actions.length} action${actions.length > 1 ? "s" : ""}`,
+        valeur: `${actionsRecruteur.length} action${actionsRecruteur.length > 1 ? "s" : ""}`,
       };
     }),
     personnel,
-    note: "Les résultats agrègent uniquement la dernière évaluation validée de chaque recruteur visible.",
+    note: "Les résultats agrègent le niveau courant des indicateurs issus de la dernière évaluation validée de chaque recruteur visible.",
   };
 }
 
@@ -153,7 +154,8 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
   const dernieres = dernieresEvaluationsValidees(evaluations);
   const idsEvaluations = new Set(dernieres.map((ligne) => nombre(ligne.id)).filter((id): id is number => Boolean(id)));
   const reponses = lignes(tables.Reponses).filter((ligne) => idsEvaluations.has(ref(ligne.Evaluation) ?? 0));
-  const actionsOuvertes = lignes(tables.ActionsProgres).filter(actionOuverte);
+  const actions = lignes(tables.ActionsProgres);
+  const actionsOuvertes = actions.filter(actionOuverte);
   const fiches = lignes(tables.FichesEnseignement);
   const taux = recruteurs.length ? Math.round((dernieres.length / recruteurs.length) * 100) : 0;
   const nomsPerimetres = new Map(perimetres.map((ligne) => [nombre(ligne.id), texte(ligne.Nom) || texte(ligne.Code)]));
@@ -182,7 +184,7 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
         detail: `${fiches.filter((ligne) => choix(ligne.Statut) === "BROUILLON").length} brouillon(s)`,
       },
     ],
-    repartition: repartitionNiveaux(reponses),
+    repartition: repartitionNiveauxCourants(reponses, actions),
     titreSuivi: "Répartition par périmètre",
     lignes: [...repartitionPerimetres.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -193,7 +195,7 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
         valeur: String(total),
       })),
     personnel,
-    note: "La consolidation utilise la dernière évaluation validée de chaque recruteur, sans classement ni note globale.",
+    note: "La consolidation utilise le niveau courant des indicateurs de la dernière évaluation validée de chaque recruteur, sans classement ni note globale.",
   };
 }
 
@@ -263,10 +265,22 @@ function dernieresEvaluationsValidees(evaluations: Record<string, unknown>[]): R
   return [...parRecruteur.values()];
 }
 
-function repartitionNiveaux(reponses: Record<string, unknown>[]): { rouge: number; orange: number; vert: number } {
+function repartitionNiveauxCourants(
+  reponses: Record<string, unknown>[],
+  actions: Record<string, unknown>[],
+): { rouge: number; orange: number; vert: number } {
+  const niveauParReponse = new Map<number, string>();
+  actions.forEach((action) => {
+    const reponseId = ref(action.Reponse);
+    const niveauCourant = choix(action.NiveauCourant);
+    if (reponseId && ["ROUGE", "ORANGE", "VERT"].includes(niveauCourant)) niveauParReponse.set(reponseId, niveauCourant);
+  });
+
   return reponses.reduce<{ rouge: number; orange: number; vert: number }>((resultat, ligne) => {
-    const niveau = choix(ligne.Niveau).toLowerCase();
-    if (niveau === "rouge" || niveau === "orange" || niveau === "vert") resultat[niveau] += 1;
+    const reponseId = nombre(ligne.id);
+    const niveau = (reponseId ? niveauParReponse.get(reponseId) : undefined) ?? choix(ligne.Niveau);
+    const cle = niveau.toLowerCase();
+    if (cle === "rouge" || cle === "orange" || cle === "vert") resultat[cle] += 1;
     return resultat;
   }, { rouge: 0, orange: 0, vert: 0 });
 }
