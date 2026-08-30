@@ -33,7 +33,7 @@ const entreesCommunes: readonly EntreeMenu[] = [
 
 const menusMetier: Record<RoleUtilisateur, readonly EntreeMenu[]> = {
   RECRUTEUR: [
-    { id: "evaluation", libelle: "Nouvelle auto-évaluation", description: "Démarrer ou poursuivre votre questionnaire d’auto-évaluation." },
+    { id: "evaluation", libelle: "Auto-évaluation", description: "Débuter une nouvelle auto-évaluation ou reprendre une évaluation en cours." },
     { id: "resultats", libelle: "Mes résultats", description: "Consulter le bilan de votre dernière évaluation et les synthèses par axe." },
     { id: "progression", libelle: "Ma progression", description: "Suivre vos actions, consulter les modules et demander leur validation." },
     { id: "fiches", libelle: "Fiches d’enseignement", description: "Consulter les ressources pédagogiques qui vous sont affectées." },
