@@ -46,26 +46,62 @@
 }
 
 section[aria-labelledby="questionnaire"] .actions-formulaire::before {
-  content: "Dès la première réponse, vos choix sont sauvegardés dans Grist. Vous pourrez revenir ultérieurement pour compléter votre brouillon.";
+  content: "Dès la première réponse, vos choix sont sauvegardés automatiquement dans Grist. Vous pourrez revenir ultérieurement pour compléter votre brouillon.";
   flex: 1 1 320px;
-  max-width: 430px;
+  max-width: 520px;
   color: #526174;
   font-size: .78rem;
   font-weight: 700;
   line-height: 1.45;
 }
 
+/* La sauvegarde est automatique dès la première réponse : le bouton manuel devient inutile. */
+section[aria-labelledby="questionnaire"] .actions-formulaire > .bouton-secondaire {
+  display: none;
+}
+
+/* Le retour vert reste visible brièvement puis disparaît sans masquer les erreurs éventuelles. */
 section[aria-labelledby="questionnaire"] form > .message-formulaire[aria-live="polite"] {
   position: sticky;
   z-index: 4;
   bottom: 104px;
+  max-height: 90px;
   margin: 12px 0 0;
   padding: 12px 14px;
+  overflow: hidden;
   color: #175c37;
   background: #eaf7ef;
   border: 1px solid #b8dec8;
   border-radius: 9px;
   box-shadow: 0 8px 20px rgb(23 35 52 / 10%);
+  animation: disparition-message-sauvegarde 4s ease forwards;
+}
+
+@keyframes disparition-message-sauvegarde {
+  0%, 72% {
+    max-height: 90px;
+    margin-top: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    opacity: 1;
+    border-width: 1px;
+  }
+  100% {
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    border-width: 0;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  section[aria-labelledby="questionnaire"] form > .message-formulaire[aria-live="polite"] {
+    animation-duration: .01ms;
+    animation-delay: 4s;
+  }
 }
 
 @media (max-width: 900px) {
