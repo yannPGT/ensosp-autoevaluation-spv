@@ -17,7 +17,7 @@ const baseUtilisateur: UtilisateurCourant = {
 };
 
 describe("construireTableauDeBord", () => {
-  it("calcule le tableau personnel du recruteur", () => {
+  it("calcule le tableau personnel du recruteur avec les niveaux courants validés", () => {
     const tableau = construireTableauDeBord(baseUtilisateur, {
       Evaluations: {
         id: [10, 11], Recruteur: [7, 7], Statut: ["VALIDEE", "BROUILLON"],
@@ -25,7 +25,7 @@ describe("construireTableauDeBord", () => {
       },
       Reponses: { id: [1, 2, 3], Evaluation: [10, 10, 10], Niveau: ["ROUGE", "ORANGE", "VERT"] },
       ActionsProgres: {
-        id: [20, 21, 22], Recruteur: [7, 7, 7],
+        id: [20, 21, 22], Recruteur: [7, 7, 7], Reponse: [1, 2, 2],
         Statut: ["EN_COURS", "PROGRESSION_VALIDEE", "EN_ATTENTE_VALIDATION"],
         Echeance: [4_102_444_800, 4_102_444_800, 4_102_444_800],
         FicheVersion: [5, 5, 6], NiveauCourant: ["ROUGE", "VERT", "ORANGE"],
@@ -35,7 +35,7 @@ describe("construireTableauDeBord", () => {
     expect(carte(tableau, "Actions ouvertes").valeur).toBe("2");
     expect(carte(tableau, "Validations en attente").valeur).toBe("1");
     expect(carte(tableau, "Fiches affectées").valeur).toBe("2");
-    expect(tableau.repartition).toEqual({ rouge: 1, orange: 1, vert: 1 });
+    expect(tableau.repartition).toEqual({ rouge: 1, orange: 0, vert: 2 });
   });
 
   it("agrège seulement la dernière évaluation validée de chaque recruteur", () => {
