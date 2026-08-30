@@ -48,13 +48,14 @@ export async function chargerUtilisateurCourant(): Promise<UtilisateurCourant> {
       throw new Error("Votre adresse Grist ne correspond à aucun compte actif dans Utilisateurs.");
     }
 
-    const [utilisateurs, entites, perimetres] = await Promise.all([
+    const [utilisateurs, entites, perimetres, affectationsSuperviseurs] = await Promise.all([
       grist.docApi.fetchTable("Utilisateurs"),
       grist.docApi.fetchTable("Entites"),
       grist.docApi.fetchTable("Perimetres"),
+      grist.docApi.fetchTable("AffectationsSuperviseurs"),
     ]);
 
-    return construireUtilisateur(utilisateurId, utilisateurs, entites, perimetres);
+    return construireUtilisateur(utilisateurId, utilisateurs, entites, perimetres, affectationsSuperviseurs);
   } finally {
     if (contexteId) {
       try {
@@ -71,6 +72,7 @@ export function construireUtilisateur(
   utilisateurs: TableGrist,
   entites: TableGrist,
   perimetres: TableGrist,
+  affectationsSuperviseurs: TableGrist = {},
 ): UtilisateurCourant {
   const index = trouverIndex(utilisateurs, "id", utilisateurId);
   if (index < 0) throw new Error("Votre fiche Utilisateurs n’est pas accessible avec les ACL actuelles.");
@@ -78,17 +80,23 @@ export function construireUtilisateur(
   const actif = booleen(utilisateurs.Actif?.[index]);
   if (!actif) throw new Error("Votre compte applicatif est désactivé.");
 
+  const role = normaliserRole(utilisateurs.Role?.[index]);
+  const perimetrePrincipalId = referenceId(utilisateurs.PerimetrePrincipal?.[index]);
+
   return {
     id: utilisateurId,
     prenom: texte(utilisateurs.Prenom?.[index]) || "Utilisateur",
     nom: texte(utilisateurs.Nom?.[index]),
     email: texte(utilisateurs.Email?.[index]),
-    role: normaliserRole(utilisateurs.Role?.[index]),
+    role,
     entite: libelleReference(utilisateurs.Entite?.[index], entites),
     perimetrePrincipal: libelleReference(utilisateurs.PerimetrePrincipal?.[index], perimetres),
     perimetresSupervises: listeReferences(utilisateurs.PerimetresSupervises?.[index])
       .map((id) => libelleReference(id, perimetres))
       .filter(Boolean),
+    superviseurNom: role === "RECRUTEUR"
+      ? trouverSuperviseur(perimetrePrincipalId, affectationsSuperviseurs, utilisateurs)
+      : "—",
     peutGererPedagogie: booleen(utilisateurs.PeutGererPedagogie?.[index]),
     actif,
   };
@@ -97,6 +105,24 @@ export function construireUtilisateur(
 export function obtenirDocApiGrist(): DocApiGrist | null {
   if (window.parent === window) return null;
   return window.grist?.docApi ?? null;
+}
+
+function trouverSuperviseur(
+  perimetreId: number | null,
+  affectations: TableGrist,
+  utilisateurs: TableGrist,
+): string {
+  if (!perimetreId) return "Non renseigné";
+  const index = (affectations.id ?? []).findIndex((_, i) =>
+    referenceId(affectations.Perimetre?.[i]) === perimetreId
+    && booleen(affectations.Actif?.[i])
+  );
+  if (index < 0) return "Non renseigné";
+  const superviseurId = referenceId(affectations.Superviseur?.[index]);
+  if (!superviseurId) return "Non renseigné";
+  const ui = trouverIndex(utilisateurs, "id", superviseurId);
+  if (ui < 0) return "Non renseigné";
+  return `${texte(utilisateurs.Prenom?.[ui])} ${texte(utilisateurs.Nom?.[ui])}`.trim() || texte(utilisateurs.Email?.[ui]) || "Non renseigné";
 }
 
 function trouverIndex(table: TableGrist, colonne: string, valeur: unknown): number {
