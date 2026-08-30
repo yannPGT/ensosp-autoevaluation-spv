@@ -143,8 +143,9 @@ export async function enregistrerReponse(evaluationId: number, code: string, niv
     && referenceId(reponses.Indicateur?.[i]) === indicateurId
   );
   const reponseId = nombre(reponses.id?.[ri]);
+  const dateModification = maintenant();
   const action = reponseId
-    ? ["UpdateRecord", "Reponses", reponseId, { Niveau: niveau, DateReponse: maintenant() }]
+    ? ["UpdateRecord", "Reponses", reponseId, { Niveau: niveau, DateReponse: dateModification }]
     : ["AddRecord", "Reponses", null, {
         Uid: crypto.randomUUID(),
         Evaluation: evaluationId,
@@ -152,9 +153,12 @@ export async function enregistrerReponse(evaluationId: number, code: string, niv
         Perimetre: perimetre,
         Indicateur: indicateurId,
         Niveau: niveau,
-        DateReponse: maintenant(),
+        DateReponse: dateModification,
       }];
-  await api.applyUserActions([action]);
+  await api.applyUserActions([
+    action,
+    ["UpdateRecord", "Evaluations", evaluationId, { UpdatedAt: dateModification }],
+  ]);
 }
 
 export async function validerEvaluation(evaluationId: number, utilisateur: UtilisateurCourant): Promise<ResultatValidation> {
@@ -190,9 +194,11 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
     throw new Error("Tous les indicateurs obligatoires doivent être renseignés.");
   }
 
+  const dateValidation = maintenant();
   await api.applyUserActions([["UpdateRecord", "Evaluations", evaluationId, {
     Statut: "VALIDEE",
-    DateValidation: maintenant(),
+    DateValidation: dateValidation,
+    UpdatedAt: dateValidation,
   }]]);
 
   let avertissement: string | null = null;
