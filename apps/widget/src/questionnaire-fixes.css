@@ -1,0 +1,78 @@
+/* Correctifs ciblés du questionnaire : cartes de réponse et retour de sauvegarde. */
+
+.choix-niveaux {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.choix-niveau {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 112px;
+  padding: 16px;
+  color: #172334;
+  cursor: pointer;
+  background: #fafbfc;
+  border: 2px solid #e1e5ea;
+  border-radius: 12px;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+.choix-niveau:hover {
+  border-color: #9ca8b6;
+  transform: translateY(-1px);
+}
+
+.choix-niveau.choix-selectionne {
+  background: #eef3f8;
+  border-color: #172334;
+  box-shadow: 0 0 0 1px #172334;
+}
+
+.choix-niveau input {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  margin: 2px 0 0;
+  accent-color: #172334;
+}
+
+.choix-niveau > span {
+  line-height: 1.5;
+}
+
+section[aria-labelledby="questionnaire"] .actions-formulaire::before {
+  content: "Dès la première réponse, vos choix sont sauvegardés dans Grist. Vous pourrez revenir ultérieurement pour compléter votre brouillon.";
+  flex: 1 1 320px;
+  max-width: 430px;
+  color: #526174;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+section[aria-labelledby="questionnaire"] form > .message-formulaire[aria-live="polite"] {
+  position: sticky;
+  z-index: 4;
+  bottom: 104px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  color: #175c37;
+  background: #eaf7ef;
+  border: 1px solid #b8dec8;
+  border-radius: 9px;
+  box-shadow: 0 8px 20px rgb(23 35 52 / 10%);
+}
+
+@media (max-width: 900px) {
+  .choix-niveaux { grid-template-columns: 1fr; }
+  section[aria-labelledby="questionnaire"] .actions-formulaire { flex-wrap: wrap; }
+  section[aria-labelledby="questionnaire"] .actions-formulaire::before {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
