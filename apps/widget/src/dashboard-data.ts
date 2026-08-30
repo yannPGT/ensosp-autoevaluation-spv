@@ -315,7 +315,13 @@ function temps(valeur: unknown): number {
 }
 
 function ref(valeur: unknown): number | null {
-  return typeof valeur === "number" && valeur > 0 ? valeur : null;
+  if (typeof valeur === "number" && valeur > 0) return valeur;
+  if (Array.isArray(valeur)) {
+    for (let index = valeur.length - 1; index >= 0; index -= 1) {
+      if (typeof valeur[index] === "number" && valeur[index] > 0) return valeur[index];
+    }
+  }
+  return null;
 }
 
 function nombre(valeur: unknown): number | null {

@@ -44,10 +44,13 @@ describe("construireTableauDeBord", () => {
         Role: ["RECRUTEUR", "RECRUTEUR", "RECRUTEUR"], Actif: [true, true, true],
       },
       Evaluations: {
-        id: [10, 11, 12], Recruteur: [7, 7, 8], Statut: ["VALIDEE", "VALIDEE", "VALIDEE"],
+        id: [10, 11, 12], Recruteur: [["Ref", 7], ["Ref", 7], ["Ref", 8]], Statut: ["VALIDEE", "VALIDEE", "VALIDEE"],
         DateValidation: [1_600_000_000, 1_700_000_000, 1_700_000_000],
       },
-      Reponses: { id: [1, 2, 3], Evaluation: [10, 11, 12], Niveau: ["ROUGE", "VERT", "ORANGE"] },
+      Reponses: {
+        id: [1, 2, 3], Evaluation: [["Ref", 10], ["Ref", 11], ["Ref", 12]],
+        Niveau: ["ROUGE", "VERT", "ORANGE"],
+      },
       ActionsProgres: { id: [], Statut: [] },
     });
 
