@@ -92,7 +92,7 @@ export function construireDonneesUtilisateurs(
       nom: texte(tableUtilisateurs.Nom?.[index]),
       prenom: texte(tableUtilisateurs.Prenom?.[index]),
       role,
-      peutGererPedagogie: booleen(tableUtilisateurs.PeutGererPedagogie?.[index]),
+      peutGererPedagogie: role === "ADMIN",
       entiteId,
       entite: (entiteId && nomsEntites.get(entiteId)) || "Non renseignée",
       perimetrePrincipalId,
@@ -120,7 +120,7 @@ export function preparerChampsUtilisateur(saisie: SaisieUtilisateur): Record<str
     Nom: saisie.nom.trim().toLocaleUpperCase("fr"),
     Prenom: normaliserPrenom(saisie.prenom),
     Role: saisie.role,
-    PeutGererPedagogie: saisie.role !== "RECRUTEUR" && saisie.peutGererPedagogie,
+    PeutGererPedagogie: saisie.role === "ADMIN",
     Entite: saisie.entiteId,
     PerimetrePrincipal: saisie.perimetrePrincipalId,
     Actif: saisie.actif,
@@ -159,7 +159,7 @@ function donneesDemonstration(): DonneesUtilisateurs {
   return construireDonneesUtilisateurs({
     id: [1, 2, 3], Email: ["alex@example.invalid", "camille@example.invalid", "morgan@example.invalid"],
     Nom: ["MARTIN", "BERNARD", "ROBERT"], Prenom: ["Alex", "Camille", "Morgan"],
-    Role: ["ADMIN", "SUPERVISEUR", "RECRUTEUR"], PeutGererPedagogie: [true, true, false],
+    Role: ["ADMIN", "SUPERVISEUR", "RECRUTEUR"], PeutGererPedagogie: [true, false, false],
     Entite: [1, 1, 1], PerimetrePrincipal: [1, 1, 1], PerimetresSupervises: [["L"], ["L", 1], ["L"]],
     Actif: [true, true, false], DateActivation: [1_700_006_400, 1_700_006_400, 1_700_006_400], DateDesactivation: [null, null, 1_730_000_000],
   }, referencesVersTable(entites), referencesVersTable(perimetres, true));

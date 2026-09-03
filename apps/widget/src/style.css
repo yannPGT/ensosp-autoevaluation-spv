@@ -531,6 +531,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
 .entete-action-progres code { color:#b4202a; font-size:.72rem; font-weight:900; }
 .entete-action-progres h3 { margin:0; }
 .ressource-associee { padding:10px; background:#f5f7f9; border-radius:8px; }
+.ressource-associee { display:grid; gap:10px; }
+.confirmation-fiche { display:flex!important; align-items:center; gap:9px; padding:12px; border:1px solid #dce1e7; border-radius:8px; background:#fff; }
+.confirmation-fiche input { width:19px; min-height:19px; accent-color:#172334; }
 .grille-fiches-recruteur,.liste-recruteurs-op { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .grille-fiches-recruteur article,.liste-recruteurs-op article { display:grid; gap:14px; padding:18px; border:1px solid #dce1e7; border-radius:12px; }
 .grille-fiches-recruteur h3,.grille-fiches-recruteur p { margin:0; }

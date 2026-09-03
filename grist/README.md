@@ -7,6 +7,10 @@
 
 Le schéma source est [`schema/tables.json`](schema/tables.json). Il contient les tables du cahier des charges : aucun script ne doit supprimer ou modifier implicitement une colonne existante.
 
+L’évolution des fiches d’enseignement nécessite l’ajout de `ActionsProgres.PriseEnCompteFiche` et l’application de la matrice décrite dans [`../docs/ACL_FICHES_ENSEIGNEMENT.md`](../docs/ACL_FICHES_ENSEIGNEMENT.md). La modification de l’interface seule ne sécurise pas les données.
+
+L’évolution des fiches d’enseignement nécessite l’ajout de `ActionsProgres.PriseEnCompteFiche` et l’application de la matrice décrite dans [`../docs/ACL_FICHES_ENSEIGNEMENT.md`](../docs/ACL_FICHES_ENSEIGNEMENT.md). La modification de l’interface seule ne sécurise pas les données.
+
 ## Préconditions manuelles restantes
 
 - URL et identifiant du document Grist ; compte administrateur autorisé à créer des tables ;

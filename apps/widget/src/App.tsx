@@ -110,7 +110,7 @@ export function App() {
           {pageActive === "territoires" && <ModuleTerritoires />}
           {pageActive === "affectations" && <ModuleAffectations />}
           {pageActive === "referentiel" && <ModuleReferentiel />}
-          {pageActive === "pedagogie" && <ModulePedagogique utilisateur={utilisateur} />}
+          {pageActive === "pedagogie" && utilisateur.role === "ADMIN" && <ModulePedagogique utilisateur={utilisateur} />}
           {pageActive === "parametres" && <ModuleParametres utilisateur={utilisateur} />}
           {pageActive === "audit-exports" && <ModuleAudit utilisateur={utilisateur} />}
           {(["progression", "fiches", "historique", "recruteurs", "evaluations-recruteurs", "progres-a-valider", "progres-ouverts", "echeances", "gestion-recruteurs"].includes(pageActive)) && <ModuleOperationnel page={pageActive} utilisateur={utilisateur} />}

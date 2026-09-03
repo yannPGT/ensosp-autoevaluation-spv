@@ -14,3 +14,7 @@ Le fichier `autoevaluation.ods` n'est pas présent. Le référentiel de 3 axes e
 
 Les durées de conservation et la limite de taille PDF ne sont pas encore validées. Aucun effacement automatique ne sera implémenté avant cette validation. La valeur de démarrage proposée pour `PDF_MAX_SIZE_MB` est 10.
 
+## ADR-004 - Rattachement et prise en compte des fiches d’enseignement
+
+Chaque fiche possède une seule liaison active vers un indicateur et un seul niveau déclencheur, rouge ou orange. Le PDF publié reste stocké une seule fois dans `FicheVersions` ; les actions de progression ne conservent qu’une référence vers cette version. La consultation, le téléchargement et la déclaration de prise en compte sont historisés dans `ConsultationsFiches`. La gestion éditoriale est réservée au rôle Administrateur et doit être garantie par les ACL Grist.
+

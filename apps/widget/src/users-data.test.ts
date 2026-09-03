@@ -20,7 +20,7 @@ describe("données du module Utilisateurs", () => {
     });
   });
 
-  it("normalise les identités et retire le droit pédagogique d’un recruteur", () => {
+  it("normalise les identités et réserve le droit pédagogique à l’administrateur", () => {
     const champs = preparerChampsUtilisateur({
       email: "  Morgan.ROBERT@EXAMPLE.FR ", nom: " robert ", prenom: "mORGAN",
       role: "RECRUTEUR", peutGererPedagogie: true, entiteId: 2, perimetrePrincipalId: 11, actif: true,
@@ -32,6 +32,8 @@ describe("données du module Utilisateurs", () => {
     });
     expect(champs).toHaveProperty("DateActivation");
     expect(champs.DateDesactivation).toBeNull();
+    expect(preparerChampsUtilisateur({ email: "sup@example.fr", nom: "SUP", prenom: "Sue", role: "SUPERVISEUR", peutGererPedagogie: true, entiteId: 2, perimetrePrincipalId: 11, actif: true }).PeutGererPedagogie).toBe(false);
+    expect(preparerChampsUtilisateur({ email: "admin@example.fr", nom: "ADMIN", prenom: "Ada", role: "ADMIN", peutGererPedagogie: false, entiteId: 2, perimetrePrincipalId: 11, actif: true }).PeutGererPedagogie).toBe(true);
   });
 
   it("ne réécrit les dates d’activation que lors d’un changement de statut", () => {

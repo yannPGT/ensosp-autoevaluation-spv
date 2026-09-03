@@ -11,6 +11,7 @@ import {
   definirEcheance,
   demarrerAction,
   DonneesOperationnelles,
+  FicheDisponible,
   journaliserConsultation,
   urlPieceJointe,
 } from "./operational-data.js";
@@ -22,7 +23,7 @@ type Etat =
 
 const titres: Record<string, [string, string]> = {
   progression: ["Ma progression", "Suivez vos actions et transmettez vos progrès à votre superviseur."],
-  fiches: ["Fiches d’enseignement", "Consultez les ressources pédagogiques associées à vos actions."],
+  fiches: ["Fiches d’enseignement", "Consultez ou téléchargez toutes les fiches publiées après votre première évaluation validée."],
   historique: ["Historique", "Retrouvez vos évaluations et les décisions de progression."],
   recruteurs: ["Mes recruteurs", "Consultez les recruteurs visibles dans vos périmètres supervisés."],
   "gestion-recruteurs": ["Gestion des recruteurs", "Gérez les autorisations de nouvelle auto-évaluation dans les limites de vos ACL."],
@@ -77,7 +78,7 @@ function Vue({ page, d, utilisateur, notifier, recharger }: {
 }) {
   if (page === "resultats") return <Resultats d={d} />;
   if (page === "progression") return <Progression actions={d.actions} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
-  if (page === "fiches") return <Fiches actions={d.actions} utilisateur={utilisateur} notifier={notifier} />;
+  if (page === "fiches") return <Fiches d={d} utilisateur={utilisateur} notifier={notifier} />;
   if (page === "historique") return <Historique d={d} />;
   if (page === "recruteurs" || page === "gestion-recruteurs") return <Recruteurs d={d} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
   if (page === "evaluations-recruteurs") return <Evaluations d={d} />;
@@ -118,49 +119,69 @@ function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
   recharger: () => void;
 }) {
   const [commentaire, setCommentaire] = useState(a.commentaireRecruteur);
+  const [priseEnCompte, setPriseEnCompte] = useState(a.priseEnCompteFiche);
   const [operation, setOperation] = useState(false);
   const agir = async (type: "DEMARRER" | "ENVOYER") => {
     setOperation(true);
     try {
       if (type === "DEMARRER") await demarrerAction(a.id);
-      else await declarerProgression(a.id, commentaire);
-      notifier("succes", type === "DEMARRER" ? "L’action est maintenant en cours." : "La demande de validation a été transmise.");
+      else await declarerProgression(a, commentaire, utilisateur, priseEnCompte);
+      notifier("succes", type === "DEMARRER" ? "L’action est maintenant en cours." : "La prise en compte de la fiche et la demande de validation ont été transmises.");
       recharger();
     } catch (e) {
       notifier("erreur", e instanceof Error ? e.message : "L’opération a échoué.");
     } finally { setOperation(false); }
   };
+  const ouvrir = async (type: "OUVERTURE" | "TELECHARGEMENT") => {
+    if (!a.ficheVersionId || !a.attachmentId) return;
+    setOperation(true);
+    try {
+      await ouvrirFiche(a.ficheVersionId, a.attachmentId, a.id, utilisateur, type, a.nomFichier);
+      notifier("succes", type === "OUVERTURE" ? "La consultation de la fiche a été tracée." : "Le téléchargement de la fiche a été tracé.");
+    } catch (e) {
+      notifier("erreur", e instanceof Error ? e.message : "La fiche n’a pas pu être ouverte.");
+    } finally { setOperation(false); }
+  };
+  const modifiable = ["A_PRENDRE_EN_COMPTE", "EN_COURS", "COMPLEMENT_DEMANDE", "VALIDATION_REFUSEE"].includes(a.statut);
   return (
     <article className="carte-action-progres">
       <EnteteAction action={a} />
       <p><strong>Échéance :</strong> {a.echeance}</p>
-      {a.ficheVersionId && <p className="ressource-associee">Ressource : <strong>{a.fiche}</strong> · version {a.version}</p>}
-      <label>Progrès réalisés<textarea rows={3} value={commentaire} onChange={(e) => setCommentaire(e.target.value)} disabled={a.statut === "EN_ATTENTE_VALIDATION"} /></label>
+      {a.ficheVersionId && <div className="ressource-associee"><p>Fiche proposée : <strong>{a.fiche}</strong> · version {a.version}</p><div className="actions-formulaire"><button type="button" className="bouton-secondaire" disabled={operation} onClick={() => ouvrir("OUVERTURE")}>Consulter</button><button type="button" className="bouton-secondaire" disabled={operation} onClick={() => ouvrir("TELECHARGEMENT")}>Télécharger</button></div></div>}
+      {!a.ficheVersionId && <p className="message-formulaire message-erreur">Aucune fiche publiée n’est disponible pour cet indicateur. Contactez l’administrateur.</p>}
+      <label>Progrès réalisés (facultatif)<textarea rows={3} value={commentaire} onChange={(e) => setCommentaire(e.target.value)} disabled={!modifiable} /></label>
+      {modifiable && <label className="confirmation-fiche"><input type="checkbox" checked={priseEnCompte} onChange={(e) => setPriseEnCompte(e.target.checked)} /> Prise en compte de la fiche d’enseignement réalisée</label>}
       <div className="actions-formulaire">
-        {a.statut === "A_PRENDRE_EN_COMPTE" && <button type="button" className="bouton-secondaire" disabled={operation} onClick={() => agir("DEMARRER")}>Prendre en compte</button>}
-        {["A_PRENDRE_EN_COMPTE", "EN_COURS", "COMPLEMENT_DEMANDE", "VALIDATION_REFUSEE"].includes(a.statut) && <button type="button" disabled={operation} onClick={() => agir("ENVOYER")}>Demander la validation</button>}
-        {a.statut === "EN_ATTENTE_VALIDATION" && <span>Demande transmise au superviseur.</span>}
+        {a.statut === "A_PRENDRE_EN_COMPTE" && <button type="button" className="bouton-secondaire" disabled={operation} onClick={() => agir("DEMARRER")}>Commencer l’action</button>}
+        {modifiable && <button type="button" disabled={operation || !a.ficheVersionId || !priseEnCompte} onClick={() => agir("ENVOYER")}>Demander le passage au vert</button>}
+        {a.statut === "EN_ATTENTE_VALIDATION" && <span>Prise en compte déclarée · demande transmise au superviseur.</span>}
       </div>
     </article>
   );
 }
 
-function Fiches({ actions, utilisateur, notifier }: { actions: readonly ActionMetier[]; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void }) {
-  const fiches = actions.filter((a) => a.ficheVersionId && a.attachmentId);
-  if (!fiches.length) return <Vide texte="Aucune fiche publiée n’est actuellement affectée à vos actions." />;
-  const ouvrir = async (a: ActionMetier) => {
+function Fiches({ d, utilisateur, notifier }: { d: DonneesOperationnelles; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void }) {
+  const autorise = d.evaluations.some((e) => e.recruteurId === utilisateur.id && e.statut === "VALIDEE" && e.progression === 100);
+  if (!autorise) return <Vide texte="Les fiches d’enseignement seront accessibles après votre première évaluation complète et validée." />;
+  if (!d.fiches.length) return <Vide texte="Aucune fiche d’enseignement publiée n’est disponible." />;
+  const ouvrir = async (fiche: FicheDisponible, type: "OUVERTURE" | "TELECHARGEMENT") => {
     try {
-      if (!a.ficheVersionId || !a.attachmentId) return;
-      await journaliserConsultation(a.ficheVersionId, a, utilisateur, "OUVERTURE");
-      const url = await urlPieceJointe(a.attachmentId);
-      const lien = document.createElement("a");
-      lien.href = url;
-      lien.target = "_blank";
-      lien.rel = "noopener";
-      lien.click();
+      await ouvrirFiche(fiche.versionId, fiche.attachmentId, null, utilisateur, type, fiche.nomFichier);
+      notifier("succes", type === "OUVERTURE" ? "La consultation de la fiche a été tracée." : "Le téléchargement de la fiche a été tracé.");
     } catch (e) { notifier("erreur", e instanceof Error ? e.message : "Le PDF n’a pas pu être ouvert."); }
   };
-  return <div className="grille-fiches-recruteur">{fiches.map((a) => <article key={a.id}><div><p className="surtitre">{a.codeIndicateur}</p><h3>{a.fiche}</h3><p>{a.indicateur}</p><small>{a.nomFichier} · version {a.version}</small></div><button type="button" onClick={() => ouvrir(a)}>Consulter le PDF</button></article>)}</div>;
+  return <div className="grille-fiches-recruteur">{d.fiches.map((fiche) => <article key={fiche.id}><div><p className="surtitre">{fiche.codeIndicateur} · {fiche.niveau}</p><h3>{fiche.titre}</h3><p>{fiche.indicateur}</p>{fiche.description && <p>{fiche.description}</p>}<small>{fiche.nomFichier} · version {fiche.version}</small></div><div className="actions-formulaire"><button type="button" onClick={() => ouvrir(fiche, "OUVERTURE")}>Consulter</button><button type="button" className="bouton-secondaire" onClick={() => ouvrir(fiche, "TELECHARGEMENT")}>Télécharger</button></div></article>)}</div>;
+}
+
+async function ouvrirFiche(versionId: number, attachmentId: number, actionId: number | null, utilisateur: UtilisateurCourant, type: "OUVERTURE" | "TELECHARGEMENT", nomFichier: string) {
+  await journaliserConsultation(versionId, actionId, utilisateur, type);
+  const url = await urlPieceJointe(attachmentId);
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.rel = "noopener";
+  if (type === "OUVERTURE") lien.target = "_blank";
+  else lien.download = nomFichier || "fiche-enseignement.pdf";
+  lien.click();
 }
 
 function Historique({ d }: { d: DonneesOperationnelles }) {
@@ -219,7 +240,7 @@ function Validation({ actions, utilisateur, notifier, recharger }: { actions: re
 
 function FormDecision({ action: a, utilisateur, notifier, recharger }: { action: ActionMetier; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void; recharger: () => void }) {
   const [decision, setDecision] = useState<DecisionValidation>("VALIDEE");
-  const [niveau, setNiveau] = useState<Niveau>(a.niveauCourant === "ROUGE" ? "ORANGE" : "VERT");
+  const niveau: Niveau = "VERT";
   const [commentaire, setCommentaire] = useState("");
   const [encours, setEncours] = useState(false);
   const submit = async (e: FormEvent) => {
@@ -228,8 +249,7 @@ function FormDecision({ action: a, utilisateur, notifier, recharger }: { action:
     catch (err) { notifier("erreur", err instanceof Error ? err.message : "La décision n’a pas pu être enregistrée."); }
     finally { setEncours(false); }
   };
-  const niveaux: Niveau[] = a.niveauCourant === "ROUGE" ? ["ORANGE", "VERT"] : ["VERT"];
-  return <form className="carte-action-progres" onSubmit={submit}><EnteteAction action={a} /><p><strong>Déclaration du recruteur :</strong> {a.commentaireRecruteur || "Aucun commentaire."}</p><div className="grille-decision"><label>Décision<select value={decision} onChange={(e) => setDecision(e.target.value as DecisionValidation)}><option value="VALIDEE">Valider la progression</option><option value="COMPLEMENT_DEMANDE">Demander un complément</option><option value="REFUSEE">Refuser</option></select></label>{decision === "VALIDEE" && <label>Nouveau niveau<select value={niveau} onChange={(e) => setNiveau(e.target.value as Niveau)}>{niveaux.map((n) => <option key={n}>{n}</option>)}</select></label>}</div><label>Commentaire<textarea rows={3} value={commentaire} onChange={(e) => setCommentaire(e.target.value)} required={decision !== "VALIDEE"} /></label><button disabled={encours}>{encours ? "Enregistrement…" : "Enregistrer la décision"}</button></form>;
+  return <form className="carte-action-progres" onSubmit={submit}><EnteteAction action={a} /><p><strong>Fiche d’enseignement :</strong> {a.fiche}</p><p><strong>Déclaration :</strong> {a.priseEnCompteFiche ? "Prise en compte de la fiche d’enseignement réalisée" : "Prise en compte non confirmée"}</p>{a.commentaireRecruteur && <p><strong>Commentaire du recruteur :</strong> {a.commentaireRecruteur}</p>}<div className="grille-decision"><label>Décision<select value={decision} onChange={(e) => setDecision(e.target.value as DecisionValidation)}><option value="VALIDEE">Valider le passage au vert</option><option value="COMPLEMENT_DEMANDE">Demander un complément</option><option value="REFUSEE">Refuser</option></select></label>{decision === "VALIDEE" && <label>Nouveau niveau<select value="VERT" disabled><option value="VERT">VERT</option></select></label>}</div><label>Commentaire<textarea rows={3} value={commentaire} onChange={(e) => setCommentaire(e.target.value)} required={decision !== "VALIDEE"} /></label><button disabled={encours || !a.priseEnCompteFiche}>{encours ? "Enregistrement…" : "Enregistrer la décision"}</button></form>;
 }
 
 function ActionsOuvertes({ actions, utilisateur, notifier, recharger }: { actions: readonly ActionMetier[]; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void; recharger: () => void }) {

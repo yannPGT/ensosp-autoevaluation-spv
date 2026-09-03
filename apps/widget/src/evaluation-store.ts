@@ -220,6 +220,7 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
   const dateValidation = maintenant();
   await api.applyUserActions([["UpdateRecord", "Evaluations", evaluationId, {
     Statut: "VALIDEE",
+    ProgressionComplete: 100,
     DateValidation: dateValidation,
     UpdatedAt: dateValidation,
   }]]);
@@ -254,6 +255,8 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
       const indicateur = referenceId(liaisons.Indicateur?.[i]);
       const fiche = referenceId(liaisons.Fiche?.[i]);
       if (!indicateur || !fiche) return;
+      const f = (fiches.id ?? []).findIndex((v) => nombre(v) === fiche);
+      if (f < 0 || texte(fiches.Statut?.[f]) !== "PUBLIEE" || !booleen(fiches.Actif?.[f])) return;
       const niveau = lignes.find((r) => r.indicateur === indicateur)?.niveau;
       const declenche = niveau === "ROUGE"
         ? booleen(liaisons.DeclencheRouge?.[i])
@@ -261,7 +264,6 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
           ? booleen(liaisons.DeclencheOrange?.[i])
           : false;
       if (!declenche) return;
-      const f = (fiches.id ?? []).findIndex((v) => nombre(v) === fiche);
       const version = referenceId(fiches.VersionActive?.[f]);
       if (version) versionParIndicateur.set(indicateur, version);
     });
@@ -273,7 +275,6 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
         if (reponse) reponsesDejaTraitees.add(reponse);
       }
     });
-
     const actions = lignes
       .filter((r) => r.niveau !== "VERT" && !reponsesDejaTraitees.has(r.id))
       .map((r) => ["AddRecord", "ActionsProgres", null, {
@@ -288,6 +289,7 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
         NiveauInitial: r.niveau,
         NiveauCourant: r.niveau,
         Statut: "A_PRENDRE_EN_COMPTE",
+        PriseEnCompteFiche: false,
       }]);
     if (actions.length) await api.applyUserActions(actions);
   } catch {

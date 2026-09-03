@@ -37,7 +37,7 @@ const menusMetier: Record<RoleUtilisateur, readonly EntreeMenu[]> = {
     { id: "evaluation", libelle: "Auto-évaluation", description: "Débuter une nouvelle auto-évaluation ou reprendre une évaluation en cours." },
     { id: "resultats", libelle: "Mes résultats", description: "Consulter le bilan de votre dernière évaluation et les synthèses par axe." },
     { id: "progression", libelle: "Ma progression", description: "Suivre vos actions, consulter les modules et demander leur validation." },
-    { id: "fiches", libelle: "Fiches d’enseignement", description: "Consulter les ressources pédagogiques qui vous sont affectées." },
+    { id: "fiches", libelle: "Fiches d’enseignement", description: "Consulter ou télécharger toutes les fiches publiées après votre première évaluation validée." },
     { id: "historique", libelle: "Historique", description: "Retrouver vos évaluations et les décisions de progression antérieures." },
   ],
   SUPERVISEUR: [
@@ -49,7 +49,6 @@ const menusMetier: Record<RoleUtilisateur, readonly EntreeMenu[]> = {
     { id: "echeances", libelle: "Échéances et retards", description: "Identifier les actions arrivant à échéance ou déjà dépassées." },
     { id: "gestion-recruteurs", libelle: "Gestion des recruteurs", description: "Gérer les informations autorisées des recruteurs supervisés." },
     { id: "parametrage-indicateurs", libelle: "Paramétrage des indicateurs", description: "Configurer les indicateurs applicables dans vos périmètres." },
-    { id: "pedagogie", libelle: "Gestion pédagogique", description: "Créer, publier et archiver les fiches d’enseignement.", pedagogie: true },
   ],
   ADMIN: [
     { id: "tableau-bord", libelle: "Tableau de bord global", description: "Consulter les indicateurs consolidés et les tendances par axe." },
@@ -57,7 +56,7 @@ const menusMetier: Record<RoleUtilisateur, readonly EntreeMenu[]> = {
     { id: "territoires", libelle: "Entités et périmètres", description: "Administrer l’organisation territoriale de l’application." },
     { id: "affectations", libelle: "Affectations des superviseurs", description: "Gérer les rattachements des superviseurs aux périmètres." },
     { id: "referentiel", libelle: "Référentiel", description: "Gérer les axes, indicateurs, critères et campagnes." },
-    { id: "pedagogie", libelle: "Fiches pédagogiques", description: "Gérer les fiches, leurs versions PDF et leurs publications." },
+    { id: "pedagogie", libelle: "Fiches d’enseignement", description: "Gérer les fiches, leur indicateur, leur niveau et leurs versions PDF." },
     { id: "parametres", libelle: "Paramètres", description: "Configurer les paramètres fonctionnels de l’application." },
     { id: "audit-exports", libelle: "Audit et exports", description: "Consulter le journal d’audit et produire les exports autorisés." },
   ],
@@ -66,7 +65,7 @@ const menusMetier: Record<RoleUtilisateur, readonly EntreeMenu[]> = {
 export function menuPour(utilisateur: UtilisateurCourant): readonly EntreeMenu[] {
   return [
     ...entreesCommunes,
-    ...menusMetier[utilisateur.role].filter((entree) => !entree.pedagogie || utilisateur.peutGererPedagogie),
+    ...menusMetier[utilisateur.role],
   ];
 }
 
@@ -94,7 +93,7 @@ const profilsDemonstration: Record<RoleUtilisateur, UtilisateurCourant> = {
     perimetrePrincipal: "SDIS 33 groupement NORD",
     perimetresSupervises: ["SDIS 33 groupement NORD"],
     superviseurNom: "—",
-    peutGererPedagogie: true,
+    peutGererPedagogie: false,
     actif: true,
   },
   RECRUTEUR: {

@@ -97,7 +97,7 @@ export function construireUtilisateur(
     superviseurNom: role === "RECRUTEUR"
       ? trouverSuperviseur(perimetrePrincipalId, affectationsSuperviseurs, utilisateurs)
       : "—",
-    peutGererPedagogie: booleen(utilisateurs.PeutGererPedagogie?.[index]),
+    peutGererPedagogie: role === "ADMIN",
     actif,
   };
 }

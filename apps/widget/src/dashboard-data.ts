@@ -269,16 +269,18 @@ function repartitionNiveauxCourants(
   reponses: Record<string, unknown>[],
   actions: Record<string, unknown>[],
 ): { rouge: number; orange: number; vert: number } {
-  const niveauParReponse = new Map<number, string>();
+  const niveauParReponse = new Map<number, { niveau: string; valide: boolean }>();
   actions.forEach((action) => {
     const reponseId = ref(action.Reponse);
     const niveauCourant = choix(action.NiveauCourant);
-    if (reponseId && ["ROUGE", "ORANGE", "VERT"].includes(niveauCourant)) niveauParReponse.set(reponseId, niveauCourant);
+    if (!reponseId || !["ROUGE", "ORANGE", "VERT"].includes(niveauCourant)) return;
+    const valide = choix(action.Statut) === "PROGRESSION_VALIDEE";
+    if (!niveauParReponse.get(reponseId)?.valide || valide) niveauParReponse.set(reponseId, { niveau: niveauCourant, valide });
   });
 
   return reponses.reduce<{ rouge: number; orange: number; vert: number }>((resultat, ligne) => {
     const reponseId = nombre(ligne.id);
-    const niveau = (reponseId ? niveauParReponse.get(reponseId) : undefined) ?? choix(ligne.Niveau);
+    const niveau = (reponseId ? niveauParReponse.get(reponseId)?.niveau : undefined) ?? choix(ligne.Niveau);
     const cle = niveau.toLowerCase();
     if (cle === "rouge" || cle === "orange" || cle === "vert") resultat[cle] += 1;
     return resultat;

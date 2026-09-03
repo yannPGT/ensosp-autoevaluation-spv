@@ -26,7 +26,7 @@ describe("construireUtilisateur", () => {
       entite: "SDIS de test",
       perimetrePrincipal: "Groupement Nord",
       perimetresSupervises: ["Groupement Nord", "Groupement Sud"],
-      peutGererPedagogie: true,
+      peutGererPedagogie: false,
     });
   });
 
