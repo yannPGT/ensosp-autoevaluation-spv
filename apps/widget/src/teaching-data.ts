@@ -51,7 +51,7 @@ export async function enregistrerLiaison(x:SaisieLiaison,d:DonneesPedagogiques):
 export async function ajouterVersion(x:SaisieVersion,d:DonneesPedagogiques,utilisateurId:number,maxMo=10):Promise<void>{
   validerVersion(x,d,maxMo);const fichier=x.fichier as File;const api=apiEcriture();if(!api.getAccessToken)throw new Error("Cette version de l’API Grist ne permet pas le dépôt de pièces jointes.");
   const jeton=await api.getAccessToken({readOnly:false});const formulaire=new FormData();formulaire.append("upload",fichier,fichier.name);
-  const reponse=await fetch(`${jeton.baseUrl}/attachments?auth=${encodeURIComponent(jeton.token)}`,{method:"POST",body:formulaire});if(!reponse.ok)throw new Error(`Le PDF n’a pas pu être déposé dans Grist (${reponse.status}).`);
+  const reponse=await fetch(`${jeton.baseUrl}/attachments?auth=${encodeURIComponent(jeton.token)}`,{method:"POST",headers:{"X-Requested-With":"XMLHttpRequest"},body:formulaire});if(!reponse.ok)throw new Error(`Le PDF n’a pas pu être déposé dans Grist (${reponse.status}).`);
   const ids=await reponse.json() as unknown;if(!Array.isArray(ids)||typeof ids[0]!=="number")throw new Error("Grist n’a retourné aucun identifiant de pièce jointe.");
   const fiche=d.fiches.find(f=>f.id===x.ficheId);const empreinte=await sha256(fichier);await api.applyUserActions([["AddRecord","FicheVersions",null,{Uid:crypto.randomUUID(),Fiche:x.ficheId,NumeroVersion:x.numero.trim(),FichierPDF:["L",ids[0]],NomFichier:fichier.name,TailleOctets:fichier.size,EmpreinteSHA256:empreinte,Auteur:utilisateurId,Perimetre:fiche?.perimetreId||null,EstPubliee:false,DateFinValidite:x.dateFin?dateTimestamp(x.dateFin):null}]]);
 }

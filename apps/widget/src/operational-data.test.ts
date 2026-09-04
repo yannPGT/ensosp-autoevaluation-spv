@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { construireDonneesOperationnelles, peutConsulterFiches } from "./operational-data.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { construireDonneesOperationnelles, declarerProgression, journaliserConsultation, peutConsulterFiches } from "./operational-data.js";
+import { UtilisateurCourant } from "./portal-data.js";
+
+const utilisateur:UtilisateurCourant={id:3,prenom:"Morgan",nom:"ROBERT",email:"m@x",role:"RECRUTEUR",entite:"SDIS",perimetrePrincipal:"Nord",perimetresSupervises:[],superviseurNom:"Camille",peutGererPedagogie:false,actif:true};
 
 describe("données recruteur et superviseur", () => {
+  afterEach(()=>vi.unstubAllGlobals());
   it("rattache les actions et le catalogue publié aux indicateurs", () => {
     const d = construireDonneesOperationnelles(
       { id: [3], Prenom: ["Morgan"], Nom: ["ROBERT"], Email: ["m@x"], Role: ["RECRUTEUR"], PerimetrePrincipal: [1], Actif: [true] },
@@ -25,5 +29,21 @@ describe("données recruteur et superviseur", () => {
     expect(peutConsulterFiches([{ ...base, statut: "BROUILLON", progression: 100 }], 3)).toBe(false);
     expect(peutConsulterFiches([{ ...base, statut: "VALIDEE", progression: 92 }], 3)).toBe(false);
     expect(peutConsulterFiches([{ ...base, statut: "VALIDEE", progression: 100 }], 3)).toBe(true);
+  });
+
+  it("laisse Grist horodater les consultations et la prise en compte",async()=>{
+    const applyUserActions=vi.fn().mockResolvedValue(undefined),fetchTable=vi.fn().mockResolvedValue({id:[3],PerimetrePrincipal:[1]});
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{applyUserActions,fetchTable}}});
+    await journaliserConsultation(40,null,utilisateur,"OUVERTURE");
+    const consultation=applyUserActions.mock.calls[0]![0][0][3];
+    expect(consultation).toMatchObject({FicheVersion:40,ActionProgres:null,Recruteur:3,Perimetre:1,TypeEvenement:"OUVERTURE"});
+    expect(consultation).not.toHaveProperty("DateEvenement");
+
+    const action={id:30,ficheVersionId:40,perimetreId:1} as Parameters<typeof declarerProgression>[0];
+    await declarerProgression(action,"",utilisateur,true);
+    const [miseAJour,trace]=applyUserActions.mock.calls[1]![0];
+    expect(miseAJour[3]).toMatchObject({Statut:"EN_ATTENTE_VALIDATION",PriseEnCompteFiche:true,CommentaireRecruteur:"Prise en compte de la fiche d’enseignement réalisée"});
+    expect(trace[3]).toMatchObject({FicheVersion:40,ActionProgres:30,TypeEvenement:"PRISE_EN_COMPTE"});
+    expect(trace[3]).not.toHaveProperty("DateEvenement");
   });
 });

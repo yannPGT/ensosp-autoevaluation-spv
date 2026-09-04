@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { construireDonneesPedagogiques, validerFiche, validerLiaison, validerVersion } from "./teaching-data.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ajouterVersion, construireDonneesPedagogiques, validerFiche, validerLiaison, validerVersion } from "./teaching-data.js";
 
 function donnees(){return construireDonneesPedagogiques(
   {id:[1],Code:["FICHE_IND_01"],Titre:["Premier contact"],Description:["Guide"],Perimetre:[4],Statut:["BROUILLON"],VersionActive:[2],Actif:[true]},
@@ -12,7 +12,9 @@ function donnees(){return construireDonneesPedagogiques(
 function fichier(nom:string,type:string,taille:number){return{name:nom,type,size:taille} as File}
 
 describe("données du module pédagogique",()=>{
+  afterEach(()=>vi.unstubAllGlobals());
   it("résout le périmètre, la version active et les liaisons",()=>{const d=donnees();expect(d.fiches[0]).toMatchObject({perimetre:"Groupement Nord",versionActive:"1.0",versions:1,liaisons:1});expect(d.versions[0]).toMatchObject({attachmentId:101,auteur:"Yann Admin"});expect(d.liaisons[0]).toMatchObject({codeIndicateur:"IND_01",rouge:true});});
   it("protège les codes et impose un indicateur avec un seul niveau",()=>{const d=donnees();expect(()=>validerFiche({code:"FICHE_IND_01",titre:"Doublon",description:"",perimetreId:0,actif:true,indicateurId:11,niveau:"ROUGE"},d)).toThrow(/existe déjà/);expect(()=>validerLiaison({ficheId:1,indicateurId:12,rouge:false,orange:false,actif:true},d)).toThrow(/un seul niveau/);expect(()=>validerLiaison({ficheId:1,indicateurId:12,rouge:true,orange:true,actif:true},d)).toThrow(/un seul niveau/);expect(()=>validerLiaison({ficheId:1,indicateurId:12,rouge:true,orange:false,actif:true},d)).toThrow(/déjà une liaison/);});
   it("contrôle le PDF, sa taille et le numéro de version",()=>{const d=donnees();expect(()=>validerVersion({ficheId:1,numero:"1.0",dateFin:"",fichier:fichier("guide.pdf","application/pdf",1000)},d)).toThrow(/existe déjà/);expect(()=>validerVersion({ficheId:1,numero:"1.1",dateFin:"",fichier:fichier("guide.txt","text/plain",1000)},d)).toThrow(/PDF/);expect(()=>validerVersion({ficheId:1,numero:"1.1",dateFin:"",fichier:fichier("guide.pdf","application/pdf",11*1024*1024)},d)).toThrow(/moins de 10 Mo/);expect(()=>validerVersion({ficheId:1,numero:"1.1",dateFin:"2027-01-01",fichier:fichier("guide.pdf","application/pdf",1000)},d)).not.toThrow();});
+  it("signale l’upload au serveur Grist comme une requête XMLHttpRequest",async()=>{const applyUserActions=vi.fn().mockResolvedValue(undefined);const docApi={applyUserActions,fetchTable:vi.fn(),getAccessToken:vi.fn().mockResolvedValue({baseUrl:"https://grist.example/api/docs/doc",token:"secret"})};vi.stubGlobal("window",{parent:{},grist:{docApi}});const fetchMock=vi.fn().mockResolvedValue({ok:true,json:async()=>[202]});vi.stubGlobal("fetch",fetchMock);const pdf=new File(["PDF"],"guide.pdf",{type:"application/pdf"});await ajouterVersion({ficheId:1,numero:"1.1",dateFin:"",fichier:pdf},donnees(),7);expect(fetchMock).toHaveBeenCalledWith("https://grist.example/api/docs/doc/attachments?auth=secret",expect.objectContaining({method:"POST",headers:{"X-Requested-With":"XMLHttpRequest"}}));expect(applyUserActions).toHaveBeenCalledOnce();});
 });
