@@ -273,6 +273,9 @@ function ContenuTableauDeBord({ etat, recharger, afficherPersonnel = false }: {
           </div>
         </section>
       )}
+      {afficherPersonnel && tableau.suiviPedagogique && (
+        <SuiviPedagogique lignes={tableau.suiviPedagogique} />
+      )}
       {afficherPersonnel && <PersonnelSuivi personnel={tableau.personnel} />}
       {tableau.titreSuivi && (
         <section className="bloc-tableau" aria-labelledby="titre-suivi">
@@ -290,6 +293,39 @@ function ContenuTableauDeBord({ etat, recharger, afficherPersonnel = false }: {
       )}
       {tableau.note && <p className="note-tableau">{tableau.note}</p>}
     </>
+  );
+}
+
+function SuiviPedagogique({ lignes }: { lignes: NonNullable<TableauDeBord["suiviPedagogique"]> }) {
+  return (
+    <section className="bloc-tableau" aria-labelledby="titre-suivi-pedagogique">
+      <div className="entete-suivi-pedagogique">
+        <div>
+          <h3 id="titre-suivi-pedagogique" className="titre-section">Points pédagogiques à améliorer</h3>
+          <p>Niveaux courants de la dernière évaluation validée de chaque recruteur visible.</p>
+        </div>
+      </div>
+      {lignes.length ? (
+        <div className="table-suivi-pedagogique">
+          <div className="ligne-suivi-pedagogique ligne-suivi-pedagogique-entete">
+            <span>Indicateur</span><span>Rouge</span><span>Orange</span><span>À améliorer</span><span>Part</span>
+          </div>
+          {lignes.map((ligne) => {
+            const part = ligne.echantillon ? Math.round((ligne.total / ligne.echantillon) * 100) : 0;
+            return (
+              <article className="ligne-suivi-pedagogique" key={ligne.id}>
+                <div><strong>{ligne.code || `Indicateur ${ligne.id}`}</strong><small>{ligne.titre}</small></div>
+                <b className="compteur-rouge">{ligne.rouge}</b>
+                <b className="compteur-orange">{ligne.orange}</b>
+                <b>{ligne.total}</b>
+                <span>{ligne.echantillon ? `${part} %` : "—"}</span>
+              </article>
+            );
+          })}
+        </div>
+      ) : <p className="aucun-suivi">Aucun indicateur accessible pour le moment.</p>}
+      <p className="note-suivi-pedagogique">Classement par nombre cumulé de niveaux rouges et orange. Les données restent limitées au périmètre autorisé par les ACL Grist.</p>
+    </section>
   );
 }
 

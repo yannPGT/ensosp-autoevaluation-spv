@@ -23,12 +23,23 @@ export interface PersonnelTableauDeBord {
   actionsOuvertes: number;
 }
 
+export interface SuiviPedagogiqueIndicateur {
+  id: number;
+  code: string;
+  titre: string;
+  rouge: number;
+  orange: number;
+  total: number;
+  echantillon: number;
+}
+
 export interface TableauDeBord {
   cartes: readonly CarteTableauDeBord[];
   repartition?: { rouge: number; orange: number; vert: number };
   titreSuivi?: string;
   lignes: readonly LigneTableauDeBord[];
   personnel: readonly PersonnelTableauDeBord[];
+  suiviPedagogique?: readonly SuiviPedagogiqueIndicateur[];
   note?: string;
 }
 
@@ -127,6 +138,7 @@ function tableauSuperviseur(tables: Record<string, TableGrist>): TableauDeBord {
       { valeur: String(dernieres.length), libelle: "Bilans disponibles", detail: "Dernières évaluations validées" },
     ],
     repartition: repartitionNiveauxCourants(reponses, actions),
+    suiviPedagogique: construireSuiviPedagogique(reponses, actions, lignes(tables.Indicateurs)),
     titreSuivi: "Progression individuelle",
     lignes: recruteurs.slice(0, 8).map((recruteur) => {
       const recruteurId = nombre(recruteur.id);
@@ -185,6 +197,7 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
       },
     ],
     repartition: repartitionNiveauxCourants(reponses, actions),
+    suiviPedagogique: construireSuiviPedagogique(reponses, actions, lignes(tables.Indicateurs)),
     titreSuivi: "Répartition par périmètre",
     lignes: [...repartitionPerimetres.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -202,8 +215,8 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
 function tablesPourRole(role: RoleUtilisateur): string[] {
   const communes = ["Evaluations", "Reponses", "ActionsProgres"];
   if (role === "RECRUTEUR") return communes;
-  if (role === "SUPERVISEUR") return [...communes, "Utilisateurs", "Perimetres"];
-  return [...communes, "Utilisateurs", "Perimetres", "FichesEnseignement"];
+  if (role === "SUPERVISEUR") return [...communes, "Utilisateurs", "Perimetres", "Indicateurs"];
+  return [...communes, "Utilisateurs", "Perimetres", "Indicateurs", "FichesEnseignement"];
 }
 
 function construirePersonnel(
@@ -240,7 +253,7 @@ function construirePersonnel(
 function tablesVides(): Record<string, TableGrist> {
   return {
     Evaluations: { id: [] }, Reponses: { id: [] }, ActionsProgres: { id: [] },
-    Utilisateurs: { id: [] }, Perimetres: { id: [] }, FichesEnseignement: { id: [] },
+    Utilisateurs: { id: [] }, Perimetres: { id: [] }, Indicateurs: { id: [] }, FichesEnseignement: { id: [] },
   };
 }
 
@@ -269,14 +282,7 @@ function repartitionNiveauxCourants(
   reponses: Record<string, unknown>[],
   actions: Record<string, unknown>[],
 ): { rouge: number; orange: number; vert: number } {
-  const niveauParReponse = new Map<number, { niveau: string; valide: boolean }>();
-  actions.forEach((action) => {
-    const reponseId = ref(action.Reponse);
-    const niveauCourant = choix(action.NiveauCourant);
-    if (!reponseId || !["ROUGE", "ORANGE", "VERT"].includes(niveauCourant)) return;
-    const valide = choix(action.Statut) === "PROGRESSION_VALIDEE";
-    if (!niveauParReponse.get(reponseId)?.valide || valide) niveauParReponse.set(reponseId, { niveau: niveauCourant, valide });
-  });
+  const niveauParReponse = niveauxCourantsParReponse(actions);
 
   return reponses.reduce<{ rouge: number; orange: number; vert: number }>((resultat, ligne) => {
     const reponseId = nombre(ligne.id);
@@ -285,6 +291,57 @@ function repartitionNiveauxCourants(
     if (cle === "rouge" || cle === "orange" || cle === "vert") resultat[cle] += 1;
     return resultat;
   }, { rouge: 0, orange: 0, vert: 0 });
+}
+
+function construireSuiviPedagogique(
+  reponses: Record<string, unknown>[],
+  actions: Record<string, unknown>[],
+  indicateurs: Record<string, unknown>[],
+): SuiviPedagogiqueIndicateur[] {
+  const niveauParReponse = niveauxCourantsParReponse(actions);
+  const compteurs = new Map<number, { rouge: number; orange: number; echantillon: number }>();
+
+  reponses.forEach((reponse) => {
+    const indicateurId = ref(reponse.Indicateur);
+    if (!indicateurId) return;
+    const reponseId = nombre(reponse.id);
+    const niveau = (reponseId ? niveauParReponse.get(reponseId)?.niveau : undefined) ?? choix(reponse.Niveau);
+    if (!["ROUGE", "ORANGE", "VERT"].includes(niveau)) return;
+    const compteur = compteurs.get(indicateurId) ?? { rouge: 0, orange: 0, echantillon: 0 };
+    compteur.echantillon += 1;
+    if (niveau === "ROUGE") compteur.rouge += 1;
+    if (niveau === "ORANGE") compteur.orange += 1;
+    compteurs.set(indicateurId, compteur);
+  });
+
+  return indicateurs
+    .filter((indicateur) => nombre(indicateur.id) && indicateur.Actif !== false && indicateur.Actif !== 0)
+    .map((indicateur) => {
+      const id = nombre(indicateur.id)!;
+      const compteur = compteurs.get(id) ?? { rouge: 0, orange: 0, echantillon: 0 };
+      return {
+        id,
+        code: texte(indicateur.Code),
+        titre: texte(indicateur.Titre) || `Indicateur ${id}`,
+        rouge: compteur.rouge,
+        orange: compteur.orange,
+        total: compteur.rouge + compteur.orange,
+        echantillon: compteur.echantillon,
+      };
+    })
+    .sort((a, b) => b.total - a.total || b.rouge - a.rouge || a.code.localeCompare(b.code, "fr"));
+}
+
+function niveauxCourantsParReponse(actions: Record<string, unknown>[]): Map<number, { niveau: string; valide: boolean }> {
+  const niveauParReponse = new Map<number, { niveau: string; valide: boolean }>();
+  actions.forEach((action) => {
+    const reponseId = ref(action.Reponse);
+    const niveauCourant = choix(action.NiveauCourant);
+    if (!reponseId || !["ROUGE", "ORANGE", "VERT"].includes(niveauCourant)) return;
+    const valide = choix(action.Statut) === "PROGRESSION_VALIDEE";
+    if (!niveauParReponse.get(reponseId)?.valide || valide) niveauParReponse.set(reponseId, { niveau: niveauCourant, valide });
+  });
+  return niveauParReponse;
 }
 
 function actionOuverte(ligne: Record<string, unknown>): boolean {

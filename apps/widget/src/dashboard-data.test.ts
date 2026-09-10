@@ -50,16 +50,48 @@ describe("construireTableauDeBord", () => {
       },
       Reponses: {
         id: [1, 2, 3], Evaluation: [["Ref", 10], ["Ref", 11], ["Ref", 12]],
-        Niveau: ["ROUGE", "VERT", "ORANGE"],
+        Indicateur: [["Ref", 101], ["Ref", 101], ["Ref", 102]], Niveau: ["ROUGE", "VERT", "ORANGE"],
+      },
+      Indicateurs: {
+        id: [101, 102, 103], Code: ["IND_01", "IND_02", "IND_03"],
+        Titre: ["Premier contact", "Premier accueil", "Décision"], Actif: [true, true, true],
       },
       ActionsProgres: { id: [], Statut: [] },
     });
 
     expect(carte(tableau, "Taux de réalisation").valeur).toBe("67 %");
     expect(tableau.repartition).toEqual({ rouge: 0, orange: 1, vert: 1 });
+    expect(tableau.suiviPedagogique).toEqual([
+      { id: 102, code: "IND_02", titre: "Premier accueil", rouge: 0, orange: 1, total: 1, echantillon: 1 },
+      { id: 101, code: "IND_01", titre: "Premier contact", rouge: 0, orange: 0, total: 0, echantillon: 1 },
+      { id: 103, code: "IND_03", titre: "Décision", rouge: 0, orange: 0, total: 0, echantillon: 0 },
+    ]);
     expect(tableau.lignes).toHaveLength(3);
     expect(tableau.personnel).toHaveLength(3);
     expect(tableau.personnel.find((personne) => personne.id === 9)?.derniereEvaluation).toBe("Aucune évaluation");
+  });
+
+  it("applique les progrès validés au suivi pédagogique par indicateur", () => {
+    const tableau = construireTableauDeBord({ ...baseUtilisateur, role: "ADMIN" }, {
+      Utilisateurs: { id: [7], Role: ["RECRUTEUR"], Actif: [true] },
+      Perimetres: { id: [], Actif: [] },
+      Evaluations: { id: [10], Recruteur: [7], Statut: ["VALIDEE"], DateValidation: [1_700_000_000] },
+      Reponses: {
+        id: [1, 2], Evaluation: [10, 10], Indicateur: [101, 102], Niveau: ["ROUGE", "ORANGE"],
+      },
+      ActionsProgres: {
+        id: [20], Reponse: [1], NiveauCourant: ["VERT"], Statut: ["PROGRESSION_VALIDEE"],
+      },
+      Indicateurs: {
+        id: [101, 102], Code: ["IND_01", "IND_02"], Titre: ["Contact", "Accueil"], Actif: [true, true],
+      },
+      FichesEnseignement: { id: [], Statut: [], Actif: [] },
+    });
+
+    expect(tableau.suiviPedagogique).toEqual([
+      { id: 102, code: "IND_02", titre: "Accueil", rouge: 0, orange: 1, total: 1, echantillon: 1 },
+      { id: 101, code: "IND_01", titre: "Contact", rouge: 0, orange: 0, total: 0, echantillon: 1 },
+    ]);
   });
 
   it("produit la consolidation administrateur sans classement", () => {
