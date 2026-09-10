@@ -94,6 +94,28 @@ describe("construireTableauDeBord", () => {
     ]);
   });
 
+  it("classe d'abord par rouges, puis par orange en cas d'égalité", () => {
+    const tableau = construireTableauDeBord({ ...baseUtilisateur, role: "SUPERVISEUR" }, {
+      Utilisateurs: {
+        id: [7, 8, 9], Role: ["RECRUTEUR", "RECRUTEUR", "RECRUTEUR"], Actif: [true, true, true],
+      },
+      Evaluations: {
+        id: [10, 11, 12], Recruteur: [7, 8, 9], Statut: ["VALIDEE", "VALIDEE", "VALIDEE"],
+        DateValidation: [1_700_000_000, 1_700_000_000, 1_700_000_000],
+      },
+      Reponses: {
+        id: [1, 2, 3], Evaluation: [10, 11, 12], Indicateur: [101, 102, 102],
+        Niveau: ["ROUGE", "ORANGE", "ORANGE"],
+      },
+      Indicateurs: {
+        id: [101, 102], Code: ["IND_01", "IND_02"], Titre: ["Contact", "Accueil"], Actif: [true, true],
+      },
+      ActionsProgres: { id: [], Statut: [] },
+    });
+
+    expect(tableau.suiviPedagogique?.map((ligne) => ligne.code)).toEqual(["IND_01", "IND_02"]);
+  });
+
   it("produit la consolidation administrateur sans classement", () => {
     const tableau = construireTableauDeBord({ ...baseUtilisateur, role: "ADMIN" }, {
       Utilisateurs: {

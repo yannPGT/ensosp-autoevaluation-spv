@@ -329,7 +329,7 @@ function construireSuiviPedagogique(
         echantillon: compteur.echantillon,
       };
     })
-    .sort((a, b) => b.total - a.total || b.rouge - a.rouge || a.code.localeCompare(b.code, "fr"));
+    .sort((a, b) => b.rouge - a.rouge || b.orange - a.orange || a.code.localeCompare(b.code, "fr"));
 }
 
 function niveauxCourantsParReponse(actions: Record<string, unknown>[]): Map<number, { niveau: string; valide: boolean }> {

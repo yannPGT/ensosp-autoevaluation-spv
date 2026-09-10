@@ -302,29 +302,32 @@ function SuiviPedagogique({ lignes }: { lignes: NonNullable<TableauDeBord["suivi
       <div className="entete-suivi-pedagogique">
         <div>
           <h3 id="titre-suivi-pedagogique" className="titre-section">Points pédagogiques à améliorer</h3>
-          <p>Niveaux courants de la dernière évaluation validée de chaque recruteur visible.</p>
+          <p>Suivi des points perfectibles par indicateur pour l’ensemble des recruteurs suivis.</p>
         </div>
       </div>
       {lignes.length ? (
-        <div className="table-suivi-pedagogique">
-          <div className="ligne-suivi-pedagogique ligne-suivi-pedagogique-entete">
-            <span>Indicateur</span><span>Rouge</span><span>Orange</span><span>À améliorer</span><span>Part</span>
+        <details className="details-suivi-pedagogique">
+          <summary>Afficher le détail des {lignes.length} indicateurs</summary>
+          <div className="table-suivi-pedagogique">
+            <div className="ligne-suivi-pedagogique ligne-suivi-pedagogique-entete">
+              <span>Indicateur</span><span>Rouge</span><span>Orange</span><span>À améliorer</span><span>Part</span>
+            </div>
+            {lignes.map((ligne) => {
+              const part = ligne.echantillon ? Math.round((ligne.total / ligne.echantillon) * 100) : 0;
+              return (
+                <article className="ligne-suivi-pedagogique" key={ligne.id}>
+                  <div><strong>{ligne.code || `Indicateur ${ligne.id}`}</strong><small>{ligne.titre}</small></div>
+                  <b className="compteur-rouge">{ligne.rouge}</b>
+                  <b className="compteur-orange">{ligne.orange}</b>
+                  <b>{ligne.total}</b>
+                  <span>{ligne.echantillon ? `${part} %` : "—"}</span>
+                </article>
+              );
+            })}
           </div>
-          {lignes.map((ligne) => {
-            const part = ligne.echantillon ? Math.round((ligne.total / ligne.echantillon) * 100) : 0;
-            return (
-              <article className="ligne-suivi-pedagogique" key={ligne.id}>
-                <div><strong>{ligne.code || `Indicateur ${ligne.id}`}</strong><small>{ligne.titre}</small></div>
-                <b className="compteur-rouge">{ligne.rouge}</b>
-                <b className="compteur-orange">{ligne.orange}</b>
-                <b>{ligne.total}</b>
-                <span>{ligne.echantillon ? `${part} %` : "—"}</span>
-              </article>
-            );
-          })}
-        </div>
+        </details>
       ) : <p className="aucun-suivi">Aucun indicateur accessible pour le moment.</p>}
-      <p className="note-suivi-pedagogique">Classement par nombre cumulé de niveaux rouges et orange. Les données restent limitées au périmètre autorisé par les ACL Grist.</p>
+      <p className="note-suivi-pedagogique">Classement prioritaire par nombre de niveaux rouges, puis par nombre de niveaux orange. Les données restent limitées au périmètre autorisé par les ACL Grist.</p>
     </section>
   );
 }
