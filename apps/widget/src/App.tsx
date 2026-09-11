@@ -326,7 +326,7 @@ function SuiviPedagogique({ lignes }: { lignes: NonNullable<TableauDeBord["suivi
             })}
           </div>
         </details>
-      ) : <p className="aucun-suivi">Aucun indicateur accessible pour le moment.</p>}
+      ) : <p className="aucun-suivi">Aucun point perfectible rouge ou orange n’est relevé pour le moment.</p>}
       <p className="note-suivi-pedagogique">Classement prioritaire par nombre de niveaux rouges, puis par nombre de niveaux orange. Les données restent limitées au périmètre autorisé par les ACL Grist.</p>
     </section>
   );

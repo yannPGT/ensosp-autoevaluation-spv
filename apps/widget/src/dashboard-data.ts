@@ -329,6 +329,7 @@ function construireSuiviPedagogique(
         echantillon: compteur.echantillon,
       };
     })
+    .filter((indicateur) => indicateur.total > 0)
     .sort((a, b) => b.rouge - a.rouge || b.orange - a.orange || a.code.localeCompare(b.code, "fr"));
 }
 

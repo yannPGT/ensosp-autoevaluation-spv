@@ -63,8 +63,6 @@ describe("construireTableauDeBord", () => {
     expect(tableau.repartition).toEqual({ rouge: 0, orange: 1, vert: 1 });
     expect(tableau.suiviPedagogique).toEqual([
       { id: 102, code: "IND_02", titre: "Premier accueil", rouge: 0, orange: 1, total: 1, echantillon: 1 },
-      { id: 101, code: "IND_01", titre: "Premier contact", rouge: 0, orange: 0, total: 0, echantillon: 1 },
-      { id: 103, code: "IND_03", titre: "Décision", rouge: 0, orange: 0, total: 0, echantillon: 0 },
     ]);
     expect(tableau.lignes).toHaveLength(3);
     expect(tableau.personnel).toHaveLength(3);
@@ -90,7 +88,6 @@ describe("construireTableauDeBord", () => {
 
     expect(tableau.suiviPedagogique).toEqual([
       { id: 102, code: "IND_02", titre: "Accueil", rouge: 0, orange: 1, total: 1, echantillon: 1 },
-      { id: 101, code: "IND_01", titre: "Contact", rouge: 0, orange: 0, total: 0, echantillon: 1 },
     ]);
   });
 
