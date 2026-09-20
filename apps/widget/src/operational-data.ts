@@ -13,15 +13,45 @@ export type DecisionValidation="VALIDEE"|"COMPLEMENT_DEMANDE"|"REFUSEE";
 
 export function peutConsulterFiches(evaluations:readonly EvaluationMetier[],utilisateurId:number):boolean{return evaluations.some(e=>e.recruteurId===utilisateurId&&e.statut==="VALIDEE"&&e.progression===100);}
 
-const TABLES=["Utilisateurs","Perimetres","Evaluations","Reponses","Indicateurs","ActionsProgres","Validations","FicheVersions","FichesEnseignement","FicheIndicateurs"] as const;
+const TABLES_BASE=["Utilisateurs","Perimetres","Evaluations","Reponses","Indicateurs"] as const;
+const TABLES_PEDAGOGIQUES=["FicheVersions","FichesEnseignement","FicheIndicateurs"] as const;
+type TableOperationnelle=typeof TABLES_BASE[number]|typeof TABLES_PEDAGOGIQUES[number]|"ActionsProgres"|"Validations";
 
-export async function chargerDonneesOperationnelles():Promise<DonneesOperationnelles>{
+const TABLES_PAR_PAGE:Record<string,readonly TableOperationnelle[]>={
+  resultats:TABLES_BASE,
+  historique:[...TABLES_BASE,"Validations"],
+  fiches:TABLES_BASE,
+  progression:[...TABLES_BASE,"ActionsProgres"],
+  recruteurs:TABLES_BASE,
+  "gestion-recruteurs":TABLES_BASE,
+  "evaluations-recruteurs":TABLES_BASE,
+  "progres-a-valider":[...TABLES_BASE,"ActionsProgres","Validations",...TABLES_PEDAGOGIQUES],
+  "progres-ouverts":[...TABLES_BASE,"ActionsProgres","Validations",...TABLES_PEDAGOGIQUES],
+  echeances:[...TABLES_BASE,"ActionsProgres",...TABLES_PEDAGOGIQUES],
+};
+
+export async function chargerDonneesOperationnelles(page:string,utilisateur:UtilisateurCourant):Promise<DonneesOperationnelles>{
   const api=obtenirDocApiGrist();
   if(!api)return construireDonneesOperationnelles(...demoTables());
-  const [utilisateurs,perimetres,evaluations,reponses,indicateurs,actions,validations,versions,fiches,liaisons]=await Promise.all([
-    api.fetchTable(TABLES[0]),api.fetchTable(TABLES[1]),api.fetchTable(TABLES[2]),api.fetchTable(TABLES[3]),api.fetchTable(TABLES[4]),api.fetchTable(TABLES[5]),api.fetchTable(TABLES[6]),api.fetchTable(TABLES[7]),api.fetchTable(TABLES[8]),api.fetchTable(TABLES[9]),
-  ]);
-  return construireDonneesOperationnelles(utilisateurs,perimetres,evaluations,reponses,indicateurs,actions,validations,versions,fiches,liaisons);
+  const tablesDemandees=new Set<TableOperationnelle>(TABLES_PAR_PAGE[page]??TABLES_BASE);
+  const tables=await chargerTables(api,tablesDemandees);
+  const accesPedagogiqueRequis=(page==="fiches"||page==="progression")&&evaluationValideeComplete(tables.Evaluations,utilisateur.id);
+  if(accesPedagogiqueRequis){
+    Object.assign(tables,await chargerTables(api,new Set(TABLES_PEDAGOGIQUES)));
+  }
+  return construireDonneesOperationnelles(
+    tables.Utilisateurs??{},tables.Perimetres??{},tables.Evaluations??{},tables.Reponses??{},tables.Indicateurs??{},
+    tables.ActionsProgres??{},tables.Validations??{},tables.FicheVersions??{},tables.FichesEnseignement??{},tables.FicheIndicateurs??{},
+  );
+}
+
+async function chargerTables(api:{fetchTable:(tableId:string)=>Promise<TableGrist>},tables:ReadonlySet<TableOperationnelle>):Promise<Partial<Record<TableOperationnelle,TableGrist>>>{
+  const entrees=await Promise.all([...tables].map(async table=>[table,await api.fetchTable(table)] as const));
+  return Object.fromEntries(entrees) as Partial<Record<TableOperationnelle,TableGrist>>;
+}
+
+function evaluationValideeComplete(evaluations:TableGrist|undefined,utilisateurId:number):boolean{
+  return (evaluations?.id??[]).some((_,i)=>referenceId(evaluations?.Recruteur?.[i])===utilisateurId&&texte(evaluations?.Statut?.[i])==="VALIDEE"&&(nombre(evaluations?.ProgressionComplete?.[i])??0)===100);
 }
 
 export function construireDonneesOperationnelles(utilisateurs:TableGrist,perimetres:TableGrist,evaluations:TableGrist,reponses:TableGrist,indicateurs:TableGrist,actions:TableGrist,validations:TableGrist,versions:TableGrist,fiches:TableGrist,liaisons:TableGrist={id:[]}):DonneesOperationnelles{
