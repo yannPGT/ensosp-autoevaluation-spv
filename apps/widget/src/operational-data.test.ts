@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chargerDonneesOperationnelles, construireDonneesOperationnelles, declarerProgression, journaliserConsultation, peutConsulterFiches } from "./operational-data.js";
+import { chargerDonneesOperationnelles, construireDonneesOperationnelles, deciderAction, declarerProgression, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante } from "./operational-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
 
 const utilisateur:UtilisateurCourant={id:3,prenom:"Morgan",nom:"ROBERT",email:"m@x",role:"RECRUTEUR",entite:"SDIS",perimetrePrincipal:"Nord",perimetresSupervises:[],superviseurNom:"Camille",peutGererPedagogie:false,actif:true};
@@ -124,5 +124,51 @@ describe("données recruteur et superviseur", () => {
     expect(fetchTable).toHaveBeenCalledWith("FicheVersions");
     expect(fetchTable).toHaveBeenCalledWith("FichesEnseignement");
     expect(fetchTable).toHaveBeenCalledWith("FicheIndicateurs");
+  });
+
+  it("autorise la déclaration et la validation d’une progression sans fiche disponible",async()=>{
+    const applyUserActions=vi.fn().mockResolvedValue(undefined),fetchTable=vi.fn();
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{applyUserActions,fetchTable}}});
+    const action={id:30,uid:"ACT-30",recruteurId:3,perimetreId:1,ficheVersionId:null,priseEnCompteFiche:false,niveauCourant:"ORANGE"} as Parameters<typeof declarerProgression>[0];
+
+    await declarerProgression(action,"",utilisateur,false);
+
+    expect(applyUserActions.mock.calls[0]![0]).toHaveLength(1);
+    expect(applyUserActions.mock.calls[0]![0][0][3]).toMatchObject({
+      Statut:"EN_ATTENTE_VALIDATION",
+      PriseEnCompteFiche:false,
+      CommentaireRecruteur:"Progression déclarée sans fiche d’enseignement disponible à cette date",
+    });
+
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+    await deciderAction(action,"VALIDEE","VERT","",superviseur);
+    expect(applyUserActions.mock.calls[1]![0][1][3]).toMatchObject({Statut:"PROGRESSION_VALIDEE",NiveauCourant:"VERT"});
+  });
+
+  it("rattache ultérieurement une fiche publiée avec une trace d’audit",async()=>{
+    const applyUserActions=vi.fn().mockResolvedValue(undefined);
+    const fetchTable=vi.fn(async(table:string)=>table==="ActionsProgres"
+      ? {id:[30],Uid:["ACT-30"],FicheVersion:[null]}
+      : {id:[40],EstPubliee:[true]});
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{applyUserActions,fetchTable}}});
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+
+    await rattacherFicheManquante(30,40,superviseur);
+
+    const [rattachement,audit]=applyUserActions.mock.calls[0]![0];
+    expect(rattachement).toEqual(["UpdateRecord","ActionsProgres",30,{FicheVersion:40}]);
+    expect(audit[3]).toMatchObject({Acteur:2,TypeObjet:"ACTION_PROGRES",ObjetUid:"ACT-30",Action:"RATTACHEMENT_FICHE"});
+  });
+
+  it("interdit de remplacer une version déjà rattachée",async()=>{
+    const applyUserActions=vi.fn().mockResolvedValue(undefined);
+    const fetchTable=vi.fn(async(table:string)=>table==="ActionsProgres"
+      ? {id:[30],Uid:["ACT-30"],FicheVersion:[41]}
+      : {id:[40],EstPubliee:[true]});
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{applyUserActions,fetchTable}}});
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+
+    await expect(rattacherFicheManquante(30,40,superviseur)).rejects.toThrow("ne peut pas être remplacée");
+    expect(applyUserActions).not.toHaveBeenCalled();
   });
 });
