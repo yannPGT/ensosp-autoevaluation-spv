@@ -166,9 +166,8 @@ export async function enregistrerReponse(evaluationId: number, code: string, niv
     && referenceId(reponses.Indicateur?.[i]) === indicateurId
   );
   const reponseId = nombre(reponses.id?.[ri]);
-  const dateModification = maintenant();
   const action = reponseId
-    ? ["UpdateRecord", "Reponses", reponseId, { Niveau: niveau, DateReponse: dateModification }]
+    ? ["UpdateRecord", "Reponses", reponseId, { Niveau: niveau }]
     : ["AddRecord", "Reponses", null, {
         Uid: crypto.randomUUID(),
         Evaluation: evaluationId,
@@ -176,12 +175,8 @@ export async function enregistrerReponse(evaluationId: number, code: string, niv
         Perimetre: perimetre,
         Indicateur: indicateurId,
         Niveau: niveau,
-        DateReponse: dateModification,
       }];
-  await api.applyUserActions([
-    action,
-    ["UpdateRecord", "Evaluations", evaluationId, { UpdatedAt: dateModification }],
-  ]);
+  await api.applyUserActions([action]);
 }
 
 export async function validerEvaluation(evaluationId: number, utilisateur: UtilisateurCourant): Promise<ResultatValidation> {
