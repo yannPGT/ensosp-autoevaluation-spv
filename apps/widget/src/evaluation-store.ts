@@ -201,13 +201,21 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
     if (id && booleen(indicateurs.Obligatoire?.[i]) && booleen(indicateurs.Actif?.[i])) obligatoires.add(id);
   });
   const lignes: (typeof ligneReponse)[] = [];
+  let reponseInvalide = false;
   (reponses.id ?? []).forEach((v, i) => {
     if (referenceId(reponses.Evaluation?.[i]) !== evaluationId) return;
     const id = nombre(v);
     const indicateur = referenceId(reponses.Indicateur?.[i]);
     const niveau = normaliserNiveau(reponses.Niveau?.[i]);
-    if (id && indicateur && niveau) lignes.push({ id, indicateur, niveau });
+    if (!id || !indicateur || !niveau || !obligatoires.has(indicateur)) {
+      reponseInvalide = true;
+      return;
+    }
+    lignes.push({ id, indicateur, niveau });
   });
+  if (reponseInvalide) {
+    throw new Error("Une ou plusieurs réponses sont invalides ou ne correspondent pas aux indicateurs attendus.");
+  }
   if (obligatoires.size && [...obligatoires].some((id) => !lignes.some((r) => r.indicateur === id))) {
     throw new Error("Tous les indicateurs obligatoires doivent être renseignés.");
   }
@@ -215,9 +223,7 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
   const dateValidation = maintenant();
   await api.applyUserActions([["UpdateRecord", "Evaluations", evaluationId, {
     Statut: "VALIDEE",
-    ProgressionComplete: 100,
     DateValidation: dateValidation,
-    UpdatedAt: dateValidation,
   }]]);
 
   let avertissement: string | null = null;

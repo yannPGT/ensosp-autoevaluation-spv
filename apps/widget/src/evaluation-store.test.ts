@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { enregistrerReponse } from "./evaluation-store.js";
+import { enregistrerReponse, validerEvaluation } from "./evaluation-store.js";
 import { DocApiGrist, TableGrist } from "./grist-context.js";
 
 const tables: Record<string, TableGrist> = {
@@ -27,6 +27,45 @@ function installerGrist(reponses: TableGrist) {
   vi.stubGlobal("window", { parent: {}, grist: { docApi } });
   return { applyUserActions, lotsAppliques };
 }
+
+function installerValidation(nombreReponses: number, options: { statut?: string; niveauInvalide?: boolean; horsReferentiel?: boolean } = {}) {
+  const idsIndicateurs = Array.from({ length: 13 }, (_, index) => index + 1);
+  const idsReponses = Array.from({ length: nombreReponses }, (_, index) => index + 101);
+  const tablesValidation: Record<string, TableGrist> = {
+    Evaluations: {
+      id: [10], Uid: ["evaluation-10"], Recruteur: [7], Perimetre: [3], Statut: [options.statut ?? "BROUILLON"],
+    },
+    Indicateurs: {
+      id: idsIndicateurs, Actif: idsIndicateurs.map(() => true), Obligatoire: idsIndicateurs.map(() => true),
+    },
+    Reponses: {
+      id: idsReponses,
+      Evaluation: idsReponses.map(() => 10),
+      Indicateur: idsReponses.map((_, index) => options.horsReferentiel && index === 0 ? 999 : idsIndicateurs[index]),
+      Niveau: idsReponses.map((_, index) => options.niveauInvalide && index === 0 ? "BLEU" : "VERT"),
+    },
+    FeuillesRoute: { id: [40], Evaluation: [10] },
+    FicheIndicateurs: { id: [] },
+    FichesEnseignement: { id: [] },
+    ActionsProgres: { id: [] },
+  };
+  const lotsAppliques: unknown[][][] = [];
+  const applyUserActions = vi.fn(async (actions: unknown[][]) => {
+    lotsAppliques.push(actions);
+  });
+  const docApi: DocApiGrist = {
+    applyUserActions,
+    fetchTable: vi.fn(async (tableId: string) => tablesValidation[tableId] ?? {}),
+  };
+  vi.stubGlobal("window", { parent: {}, grist: { docApi } });
+  return { applyUserActions, lotsAppliques };
+}
+
+const recruteur = {
+  id: 7, prenom: "Emy", nom: "TEST", email: "emy@example.invalid", role: "RECRUTEUR" as const,
+  entite: "SDIS test", perimetrePrincipal: "Groupement test", perimetresSupervises: [],
+  superviseurNom: "Superviseur", peutGererPedagogie: false, actif: true,
+};
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -56,5 +95,45 @@ describe("enregistrerReponse", () => {
     expect(appliquer).toHaveBeenCalledWith([
       ["UpdateRecord", "Reponses", 30, { Niveau: "VERT" }],
     ]);
+  });
+});
+
+describe("validerEvaluation", () => {
+  it("refuse une évaluation limitée à 12 réponses sur 13", async () => {
+    const { applyUserActions } = installerValidation(12);
+
+    await expect(validerEvaluation(10, recruteur)).rejects.toThrow("Tous les indicateurs obligatoires");
+    expect(applyUserActions).not.toHaveBeenCalled();
+  });
+
+  it("valide 13 réponses sans écrire les colonnes calculées ou techniques", async () => {
+    const { lotsAppliques } = installerValidation(13);
+
+    await validerEvaluation(10, recruteur);
+
+    expect(lotsAppliques[0]).toEqual([["UpdateRecord", "Evaluations", 10, {
+      Statut: "VALIDEE",
+      DateValidation: expect.any(Number),
+    }]]);
+    expect(lotsAppliques[0]?.[0]?.[3]).not.toHaveProperty("ProgressionComplete");
+    expect(lotsAppliques[0]?.[0]?.[3]).not.toHaveProperty("UpdatedAt");
+  });
+
+  it.each([
+    [{ niveauInvalide: true }, "niveau invalide"],
+    [{ horsReferentiel: true }, "indicateur hors référentiel"],
+  ])("refuse une réponse invalide : %s", async (options, _libelle) => {
+    const { applyUserActions } = installerValidation(13, options);
+
+    await expect(validerEvaluation(10, recruteur)).rejects.toThrow("réponses sont invalides");
+    expect(applyUserActions).not.toHaveBeenCalled();
+  });
+
+  it("ne recrée rien lorsqu’une évaluation est déjà validée", async () => {
+    const { applyUserActions } = installerValidation(13, { statut: "VALIDEE" });
+
+    await validerEvaluation(10, recruteur);
+
+    expect(applyUserActions).not.toHaveBeenCalled();
   });
 });
