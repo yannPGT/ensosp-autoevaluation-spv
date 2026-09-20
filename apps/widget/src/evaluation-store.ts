@@ -15,6 +15,16 @@ export interface ResultatValidation {
   avertissement: string | null;
 }
 
+export function ficheDeclenchee(
+  niveau: Niveau | undefined,
+  declencheRouge: boolean,
+  declencheOrange: boolean,
+): boolean {
+  if (niveau === "ROUGE") return declencheRouge || declencheOrange;
+  if (niveau === "ORANGE") return declencheOrange;
+  return false;
+}
+
 export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant): Promise<SessionEvaluation> {
   const api = obtenirDocApiGrist();
   if (!api) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false };
@@ -259,11 +269,11 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
       const f = (fiches.id ?? []).findIndex((v) => nombre(v) === fiche);
       if (f < 0 || texte(fiches.Statut?.[f]) !== "PUBLIEE" || !booleen(fiches.Actif?.[f])) return;
       const niveau = lignes.find((r) => r.indicateur === indicateur)?.niveau;
-      const declenche = niveau === "ROUGE"
-        ? booleen(liaisons.DeclencheRouge?.[i])
-        : niveau === "ORANGE"
-          ? booleen(liaisons.DeclencheOrange?.[i])
-          : false;
+      const declenche = ficheDeclenchee(
+        niveau,
+        booleen(liaisons.DeclencheRouge?.[i]),
+        booleen(liaisons.DeclencheOrange?.[i]),
+      );
       if (!declenche) return;
       const version = referenceId(fiches.VersionActive?.[f]);
       if (version) versionParIndicateur.set(indicateur, version);

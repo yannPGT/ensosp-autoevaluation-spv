@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { enregistrerReponse, validerEvaluation } from "./evaluation-store.js";
+import { enregistrerReponse, ficheDeclenchee, validerEvaluation } from "./evaluation-store.js";
 import { DocApiGrist, TableGrist } from "./grist-context.js";
 
 const tables: Record<string, TableGrist> = {
@@ -68,6 +68,22 @@ const recruteur = {
 };
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe("ficheDeclenchee", () => {
+  it.each([
+    ["VERT", false, true, false],
+    ["ORANGE", false, true, true],
+    ["ROUGE", false, true, true],
+    ["ORANGE", true, false, false],
+    ["ROUGE", true, false, true],
+    ["ROUGE", true, true, true],
+  ] as const)(
+    "niveau %s avec seuil rouge=%s et orange=%s retourne %s",
+    (niveau, declencheRouge, declencheOrange, attendu) => {
+      expect(ficheDeclenchee(niveau, declencheRouge, declencheOrange)).toBe(attendu);
+    },
+  );
+});
 
 describe("enregistrerReponse", () => {
   it("crée une réponse sans écrire les horodatages techniques protégés", async () => {
