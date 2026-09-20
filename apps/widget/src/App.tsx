@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { chargerTableauDeBord, PersonnelTableauDeBord, TableauDeBord } from "./dashboard-data.js";
 import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data.js";
 import { chargerSessionEvaluation, creerEvaluation, enregistrerReponse, validerEvaluation } from "./evaluation-store.js";
+import { compterReponsesNonEnregistrees, messageEchecSauvegarde } from "./questionnaire-state.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import { ModuleUtilisateurs } from "./UsersModule.js";
 import { ModuleTerritoires } from "./TerritoriesModule.js";
@@ -416,8 +417,11 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   setEtape: (etape: EtapeEvaluation) => void;
 }) {
   const [evaluationId, setEvaluationId] = useState<number | null>(null);
+  const [reponsesSauvegardees, setReponsesSauvegardees] = useState<Record<string, Niveau>>({});
   const [etatSauvegarde, setEtatSauvegarde] = useState("Chargement du brouillon…");
   const [erreurSauvegarde, setErreurSauvegarde] = useState("");
+  const [sauvegardesEnCours, setSauvegardesEnCours] = useState(0);
+  const [sessionChargee, setSessionChargee] = useState(false);
   const [avertissementFinalisation, setAvertissementFinalisation] = useState("");
   const [operationEvaluation, setOperationEvaluation] = useState(false);
   const creationEnCours = useRef<Promise<number> | null>(null);
@@ -429,6 +433,8 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
       if (!actif) return;
       setEvaluationId(session.evaluationId);
       setReponses(session.reponses);
+      setReponsesSauvegardees(session.reponses);
+      setSessionChargee(true);
       if (session.statut === "VALIDEE") {
         setEtape("FINALISEE");
         setEtatSauvegarde("Dernière évaluation validée chargée");
@@ -437,10 +443,26 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
         setEtatSauvegarde(session.evaluationId ? "Brouillon Grist chargé" : "Le brouillon sera créé à la première réponse");
       }
     }).catch((erreur: unknown) => {
-      if (actif) setErreurSauvegarde(erreur instanceof Error ? erreur.message : "Le brouillon n’a pas pu être chargé.");
+      if (actif) {
+        setSessionChargee(true);
+        setErreurSauvegarde(erreur instanceof Error ? erreur.message : "Le brouillon n’a pas pu être chargé.");
+      }
     });
     return () => { actif = false; };
   }, [utilisateur, setReponses, setEtape]);
+
+  const reponsesNonEnregistrees = sessionChargee && Object.entries(reponses)
+    .some(([code, niveau]) => reponsesSauvegardees[code] !== niveau);
+
+  useEffect(() => {
+    if (!reponsesNonEnregistrees) return;
+    const avertirSortie = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avertirSortie);
+    return () => window.removeEventListener("beforeunload", avertirSortie);
+  }, [reponsesNonEnregistrees]);
 
   const assurerEvaluation = async () => {
     if (window.parent === window) return -1;
@@ -455,13 +477,23 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     setReponses((courantes) => ({ ...courantes, [code]: niveau }));
     setEtatSauvegarde("Enregistrement dans Grist…");
     setErreurSauvegarde("");
+    setSauvegardesEnCours((nombre) => nombre + 1);
     derniereSauvegarde.current = derniereSauvegarde.current.catch(() => undefined).then(async () => {
-      const id = await assurerEvaluation();
-      if (id !== -1) await enregistrerReponse(id, code, niveau);
-      setEtatSauvegarde("Brouillon enregistré dans Grist");
+      try {
+        const id = await assurerEvaluation();
+        if (id !== -1) await enregistrerReponse(id, code, niveau);
+        setReponsesSauvegardees((courantes) => ({ ...courantes, [code]: niveau }));
+        setErreurSauvegarde("");
+        setEtatSauvegarde("Brouillon enregistré dans Grist");
+      } finally {
+        setSauvegardesEnCours((nombre) => Math.max(0, nombre - 1));
+      }
     });
     try { await derniereSauvegarde.current; }
-    catch (erreur) { setErreurSauvegarde(erreur instanceof Error ? erreur.message : "La réponse n’a pas pu être enregistrée."); }
+    catch (erreur) {
+      setEtatSauvegarde("Non enregistré — vous pouvez réessayer sans ressaisir votre réponse.");
+      setErreurSauvegarde(messageEchecSauvegarde(erreur));
+    }
   };
 
   if (etape === "BILAN") return <Bilan reponses={reponses} modifier={() => setEtape("FINALISEE")} />;
@@ -485,9 +517,35 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     );
   }
 
-  const nombreReponses = Object.keys(reponses).length;
+  const nombreReponses = Object.keys(reponsesSauvegardees).length;
+  const nombreReponsesNonEnregistrees = compterReponsesNonEnregistrees(reponses, reponsesSauvegardees);
   const nombreRestant = indicateursEvaluation.length - nombreReponses;
   const complet = nombreRestant === 0;
+
+  const reessayerSauvegarde = async () => {
+    const aSauvegarder = Object.entries(reponses)
+      .filter(([code, niveau]) => reponsesSauvegardees[code] !== niveau) as [string, Niveau][];
+    if (!aSauvegarder.length) return;
+    setOperationEvaluation(true);
+    setSauvegardesEnCours(aSauvegarder.length);
+    setEtatSauvegarde("Nouvelle tentative d’enregistrement dans Grist…");
+    setErreurSauvegarde("");
+    try {
+      const id = await assurerEvaluation();
+      for (const [code, niveau] of aSauvegarder) {
+        if (id !== -1) await enregistrerReponse(id, code, niveau);
+        setReponsesSauvegardees((courantes) => ({ ...courantes, [code]: niveau }));
+        setSauvegardesEnCours((nombre) => Math.max(0, nombre - 1));
+      }
+      setEtatSauvegarde("Brouillon enregistré dans Grist");
+    } catch (erreur) {
+      setSauvegardesEnCours(0);
+      setEtatSauvegarde("Non enregistré — vous pouvez réessayer sans ressaisir votre réponse.");
+      setErreurSauvegarde(messageEchecSauvegarde(erreur));
+    } finally {
+      setOperationEvaluation(false);
+    }
+  };
 
   const enregistrerBrouillon = async () => {
     setOperationEvaluation(true);
@@ -498,6 +556,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
       await assurerEvaluation();
       setEtatSauvegarde("Brouillon enregistré : votre évaluation n’est pas validée et reste modifiable.");
     } catch (erreur) {
+      setEtatSauvegarde("Non enregistré — vous pouvez réessayer sans ressaisir vos réponses.");
       setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être enregistrée.");
     } finally { setOperationEvaluation(false); }
   };
@@ -519,6 +578,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
         setEtape("FINALISEE");
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (erreur) {
+        setEtatSauvegarde("Validation non enregistrée — vérifiez la sauvegarde puis réessayez.");
         setErreurSauvegarde(erreur instanceof Error ? erreur.message : "L’évaluation n’a pas pu être validée.");
       } finally { setOperationEvaluation(false); }
     }
@@ -532,7 +592,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
           <h2 id="questionnaire">Décrivez votre pratique actuelle</h2>
           <p>Pour chaque indicateur, sélectionnez la situation qui correspond le mieux à votre pratique. Votre résultat ne sera révélé qu’au bilan.</p>
         </div>
-        <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateursEvaluation.length}<span>réponses</span></p>
+        <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateursEvaluation.length}<span>réponses enregistrées</span></p>
       </div>
       <form onSubmit={valider}>
         {axesEvaluation.map((axe, axeIndex) => (
@@ -557,8 +617,14 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
           <button type="button" className="bouton-secondaire" onClick={enregistrerBrouillon} disabled={operationEvaluation}>Enregistrer le brouillon</button>
           <button type="submit" disabled={!complet || operationEvaluation}>Valider mon auto-évaluation</button>
         </div>
-        <p className="message-formulaire" aria-live="polite">{etatSauvegarde}</p>
+        <p className="message-formulaire" aria-live="polite">
+          {sauvegardesEnCours > 0 ? "Enregistrement dans Grist…" : reponsesNonEnregistrees ? "Non enregistré — vous pouvez réessayer sans ressaisir votre réponse." : etatSauvegarde}
+        </p>
         {erreurSauvegarde && <p className="message-formulaire message-erreur" role="alert">{erreurSauvegarde}</p>}
+        {reponsesNonEnregistrees && sauvegardesEnCours === 0 && <div className="message-formulaire message-avertissement" role="status">
+          <p>{nombreReponsesNonEnregistrees} réponse(s) saisie(s) ne sont pas encore enregistrée(s). Ne quittez pas cette page avant une sauvegarde réussie.</p>
+          <button type="button" className="bouton-secondaire" onClick={reessayerSauvegarde} disabled={operationEvaluation}>Réessayer la sauvegarde</button>
+        </div>}
         {!complet && <p className="message-formulaire">Il reste {nombreRestant} indicateur{nombreRestant > 1 ? "s" : ""} à renseigner avant validation.</p>}
       </form>
     </section>

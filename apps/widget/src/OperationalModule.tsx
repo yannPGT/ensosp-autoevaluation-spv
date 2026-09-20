@@ -40,6 +40,10 @@ export function ModuleOperationnel({ page, utilisateur }: { page: string; utilis
   const [message, setMessage] = useState<{ type: "succes" | "erreur"; texte: string } | null>(null);
 
   useEffect(() => {
+    setMessage(null);
+  }, [page]);
+
+  useEffect(() => {
     let actif = true;
     setEtat({ statut: "chargement" });
     chargerDonneesOperationnelles()
