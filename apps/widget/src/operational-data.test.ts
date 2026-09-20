@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { construireDonneesOperationnelles, declarerProgression, journaliserConsultation, peutConsulterFiches } from "./operational-data.js";
+import { chargerDonneesOperationnelles, construireDonneesOperationnelles, declarerProgression, journaliserConsultation, peutConsulterFiches } from "./operational-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
 
 const utilisateur:UtilisateurCourant={id:3,prenom:"Morgan",nom:"ROBERT",email:"m@x",role:"RECRUTEUR",entite:"SDIS",perimetrePrincipal:"Nord",perimetresSupervises:[],superviseurNom:"Camille",peutGererPedagogie:false,actif:true};
@@ -45,5 +45,84 @@ describe("données recruteur et superviseur", () => {
     expect(miseAJour[3]).toMatchObject({Statut:"EN_ATTENTE_VALIDATION",PriseEnCompteFiche:true,CommentaireRecruteur:"Prise en compte de la fiche d’enseignement réalisée"});
     expect(trace[3]).toMatchObject({FicheVersion:40,ActionProgres:30,TypeEvenement:"PRISE_EN_COMPTE"});
     expect(trace[3]).not.toHaveProperty("DateEvenement");
+  });
+
+  it.each(["resultats","historique"])("charge %s sans lire les tables pédagogiques",async(page)=>{
+    const tables:Record<string,Record<string,unknown[]>>={
+      Utilisateurs:{id:[3],Prenom:["Morgan"],Nom:["ROBERT"],Email:["m@x"],Role:["RECRUTEUR"],PerimetrePrincipal:[1],Actif:[true]},
+      Perimetres:{id:[1],Nom:["Nord"]},
+      Evaluations:{id:[10],Uid:["E"],Recruteur:[3],Perimetre:[1],Statut:["BROUILLON"],ProgressionComplete:[8]},
+      Reponses:{id:[11],Evaluation:[10],Indicateur:[20],Niveau:["ROUGE"]},
+      Indicateurs:{id:[20],Code:["IND_01"],Titre:["Premier contact"]},
+      Validations:{id:[]},
+    };
+    const fetchTable=vi.fn(async(table:string)=>{
+      if(["FicheVersions","FichesEnseignement","FicheIndicateurs"].includes(table))throw new Error("Blocked by table read access rules");
+      return tables[table]??{id:[]};
+    });
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{fetchTable,applyUserActions:vi.fn()}}});
+
+    const donnees=await chargerDonneesOperationnelles(page,utilisateur);
+
+    expect(donnees.evaluations[0]).toMatchObject({statut:"BROUILLON",reponses:[{niveau:"ROUGE"}]});
+    expect(fetchTable).not.toHaveBeenCalledWith("FicheVersions");
+    expect(fetchTable).not.toHaveBeenCalledWith("FichesEnseignement");
+    expect(fetchTable).not.toHaveBeenCalledWith("FicheIndicateurs");
+  });
+
+  it("traite les fiches non encore autorisées comme un catalogue vide",async()=>{
+    const tables:Record<string,Record<string,unknown[]>>={
+      Utilisateurs:{id:[3],Prenom:["Morgan"],Nom:["ROBERT"],Email:["m@x"],Role:["RECRUTEUR"],PerimetrePrincipal:[1],Actif:[true]},
+      Perimetres:{id:[1],Nom:["Nord"]},
+      Evaluations:{id:[10],Uid:["E"],Recruteur:[3],Perimetre:[1],Statut:["BROUILLON"],ProgressionComplete:[8]},
+      Reponses:{id:[11],Evaluation:[10],Indicateur:[20],Niveau:["ROUGE"]},
+      Indicateurs:{id:[20],Code:["IND_01"],Titre:["Premier contact"]},
+    };
+    const fetchTable=vi.fn(async(table:string)=>{
+      if(["FicheVersions","FichesEnseignement","FicheIndicateurs"].includes(table))throw new Error("Blocked by table read access rules");
+      return tables[table]??{id:[]};
+    });
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{fetchTable,applyUserActions:vi.fn()}}});
+
+    const donnees=await chargerDonneesOperationnelles("fiches",utilisateur);
+
+    expect(donnees.fiches).toEqual([]);
+    expect(peutConsulterFiches(donnees.evaluations,utilisateur.id)).toBe(false);
+    expect(fetchTable).not.toHaveBeenCalledWith("FichesEnseignement");
+  });
+
+  it("affiche un état vide sans évaluation et sans lire la pédagogie",async()=>{
+    const fetchTable=vi.fn(async(table:string)=>{
+      if(["FicheVersions","FichesEnseignement","FicheIndicateurs"].includes(table))throw new Error("Blocked by table read access rules");
+      return table==="Utilisateurs"
+        ? {id:[3],Prenom:["Morgan"],Nom:["ROBERT"],Email:["m@x"],Role:["RECRUTEUR"],PerimetrePrincipal:[1],Actif:[true]}
+        : table==="Perimetres"?{id:[1],Nom:["Nord"]}:{id:[]};
+    });
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{fetchTable,applyUserActions:vi.fn()}}});
+
+    const donnees=await chargerDonneesOperationnelles("resultats",utilisateur);
+
+    expect(donnees.evaluations).toEqual([]);
+    expect(donnees.fiches).toEqual([]);
+    expect(fetchTable).not.toHaveBeenCalledWith("FicheVersions");
+  });
+
+  it("charge la pédagogie seulement après une évaluation validée complète",async()=>{
+    const tables:Record<string,Record<string,unknown[]>>={
+      Utilisateurs:{id:[3],Prenom:["Morgan"],Nom:["ROBERT"],Email:["m@x"],Role:["RECRUTEUR"],PerimetrePrincipal:[1],Actif:[true]},
+      Perimetres:{id:[1],Nom:["Nord"]},
+      Evaluations:{id:[10],Uid:["E"],Recruteur:[3],Perimetre:[1],Statut:["VALIDEE"],ProgressionComplete:[100]},
+      Reponses:{id:[11],Evaluation:[10],Indicateur:[20],Niveau:["ROUGE"]},
+      Indicateurs:{id:[20],Code:["IND_01"],Titre:["Premier contact"]},
+      FicheVersions:{id:[]},FichesEnseignement:{id:[]},FicheIndicateurs:{id:[]},
+    };
+    const fetchTable=vi.fn(async(table:string)=>tables[table]??{id:[]});
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{fetchTable,applyUserActions:vi.fn()}}});
+
+    await chargerDonneesOperationnelles("fiches",utilisateur);
+
+    expect(fetchTable).toHaveBeenCalledWith("FicheVersions");
+    expect(fetchTable).toHaveBeenCalledWith("FichesEnseignement");
+    expect(fetchTable).toHaveBeenCalledWith("FicheIndicateurs");
   });
 });

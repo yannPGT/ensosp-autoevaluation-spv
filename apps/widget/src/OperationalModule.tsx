@@ -46,11 +46,11 @@ export function ModuleOperationnel({ page, utilisateur }: { page: string; utilis
   useEffect(() => {
     let actif = true;
     setEtat({ statut: "chargement" });
-    chargerDonneesOperationnelles()
+    chargerDonneesOperationnelles(page, utilisateur)
       .then((donnees) => { if (actif) setEtat({ statut: "pret", donnees }); })
       .catch((e) => { if (actif) setEtat({ statut: "erreur", message: e instanceof Error ? e.message : "Les données métier n’ont pas pu être chargées." }); });
     return () => { actif = false; };
-  }, [tentative]);
+  }, [page, tentative, utilisateur.id]);
 
   if (etat.statut === "chargement") return <EtatOp texte="Chargement des données autorisées par Grist…" />;
   if (etat.statut === "erreur") return <EtatOp texte={etat.message} action={() => setTentative((x) => x + 1)} />;
