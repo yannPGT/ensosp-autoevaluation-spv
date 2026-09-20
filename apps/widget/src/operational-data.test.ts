@@ -15,13 +15,13 @@ describe("données recruteur et superviseur", () => {
       { id: [20], Code: ["IND_01"], Titre: ["Premier contact"] },
       { id: [30], Uid: ["A"], Recruteur: [3], Perimetre: [1], Indicateur: [20], NiveauInitial: ["ROUGE"], NiveauCourant: ["ORANGE"], Statut: ["EN_COURS"], PriseEnCompteFiche: [false], FicheVersion: [40] },
       { id: [] },
-      { id: [40], Fiche: [50], NumeroVersion: ["1.0"], NomFichier: ["fiche.pdf"], FichierPDF: [["L", 99]], EstPubliee: [true] },
+      { id: [40], Fiche: [50], NumeroVersion: [1.1], NomFichier: ["fiche.pdf"], FichierPDF: [["L", 99]], EstPubliee: [true] },
       { id: [50], Code: ["FICHE_01"], Titre: ["Bien accueillir"], Description: ["Repères"], VersionActive: [40], Statut: ["PUBLIEE"], Actif: [true] },
       { id: [60], Fiche: [50], Indicateur: [20], DeclencheRouge: [true], DeclencheOrange: [false], Actif: [true] },
     );
     expect(d.evaluations[0]?.reponses[0]?.codeIndicateur).toBe("IND_01");
-    expect(d.actions[0]).toMatchObject({ recruteur: "Morgan ROBERT", fiche: "Bien accueillir", attachmentId: 99, niveauCourant: "ORANGE", priseEnCompteFiche: false });
-    expect(d.fiches[0]).toMatchObject({ titre: "Bien accueillir", codeIndicateur: "IND_01", niveau: "ROUGE", versionId: 40 });
+    expect(d.actions[0]).toMatchObject({ recruteur: "Morgan ROBERT", fiche: "Bien accueillir", version: "1.1", attachmentId: 99, niveauCourant: "ORANGE", priseEnCompteFiche: false });
+    expect(d.fiches[0]).toMatchObject({ titre: "Bien accueillir", codeIndicateur: "IND_01", niveau: "ROUGE", version: "1.1", versionId: 40 });
   });
 
   it("ouvre le catalogue seulement après une évaluation complète et validée", () => {
