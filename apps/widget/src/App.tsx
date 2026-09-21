@@ -12,6 +12,7 @@ import { ModulePedagogique } from "./TeachingModule.js";
 import { ModuleParametres } from "./SettingsModule.js";
 import { ModuleAudit } from "./AuditModule.js";
 import { ModuleOperationnel } from "./OperationalModule.js";
+import { ModuleParametrage } from "./ParametrageModule.js";
 import {
   EntreeMenu,
   libellesRoles,
@@ -115,7 +116,7 @@ export function App() {
           {pageActive === "parametres" && <ModuleParametres utilisateur={utilisateur} />}
           {pageActive === "audit-exports" && <ModuleAudit utilisateur={utilisateur} />}
           {(["progression", "fiches", "historique", "recruteurs", "evaluations-recruteurs", "progres-a-valider", "progres-ouverts", "echeances", "gestion-recruteurs"].includes(pageActive)) && <ModuleOperationnel page={pageActive} utilisateur={utilisateur} />}
-          {pageActive === "parametrage-indicateurs" && <ModuleReferentiel />}
+          {pageActive === "parametrage-indicateurs" && utilisateur.role === "SUPERVISEUR" && <ModuleParametrage utilisateur={utilisateur} />}
           {pageActive === "evaluation" && (
             <Questionnaire
               utilisateur={utilisateur}
