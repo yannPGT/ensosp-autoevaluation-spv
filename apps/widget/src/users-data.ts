@@ -1,5 +1,5 @@
 import { obtenirDocApiGrist, TableGrist } from "./grist-context.js";
-import { RoleUtilisateur } from "./portal-data.js";
+import { RoleUtilisateur, UtilisateurCourant } from "./portal-data.js";
 
 export interface ReferenceAdministration {
   id: number;
@@ -57,14 +57,27 @@ export async function chargerDonneesUtilisateurs(): Promise<DonneesUtilisateurs>
   return construireDonneesUtilisateurs(utilisateurs, entites, perimetres);
 }
 
-export async function enregistrerUtilisateur(saisie: SaisieUtilisateur): Promise<void> {
+export async function enregistrerUtilisateur(saisie: SaisieUtilisateur, acteur: Pick<UtilisateurCourant, "id" | "email">): Promise<void> {
   const docApi = obtenirDocApiGrist();
   if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
   const champs = preparerChampsUtilisateur(saisie);
   const action = saisie.id
     ? ["UpdateRecord", "Utilisateurs", saisie.id, champs]
     : ["AddRecord", "Utilisateurs", null, { ...champs, CreatedAt: maintenant() }];
-  await docApi.applyUserActions([action]);
+  const objetUid = saisie.id ? String(saisie.id) : String(champs.Email);
+  const operation = saisie.id ? "MODIFICATION" : "CREATION";
+  await docApi.applyUserActions([
+    action,
+    ["AddRecord", "JournalAudit", null, {
+      Uid: crypto.randomUUID(),
+      ActeurEmail: acteur.email.trim().toLocaleLowerCase("fr"),
+      Acteur: acteur.id,
+      TypeObjet: "UTILISATEUR",
+      ObjetUid: objetUid,
+      Action: `${operation}_UTILISATEUR`,
+      Resume: saisie.id ? `Compte utilisateur ${objetUid} mis à jour` : `Compte utilisateur ${objetUid} créé`,
+    }],
+  ]);
 }
 
 export function construireDonneesUtilisateurs(

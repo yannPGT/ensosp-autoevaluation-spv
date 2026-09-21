@@ -39,3 +39,13 @@ La recette C-03 n'est considérée complète qu'après vérification de ces ACL 
 ## Migration C-11 — ACL de Validations
 
 La table `Validations` ne doit pas conserver de règle générale accordant tous les droits à un Superviseur actif. Supprimer la règle `user.Profil.Actif and user.Profil.Role == "SUPERVISEUR"` et appliquer la politique détaillée documentée dans [`migrations/2026-09-21-c11-validations-acl.md`](migrations/2026-09-21-c11-validations-acl.md). La recette doit couvrir les lectures et créations hors périmètre, le faux auteur, l'action étrangère et les décisions incohérentes.
+
+## Migration C-12 — droits d’identité des administrateurs
+
+La table `Utilisateurs` doit autoriser explicitement la mise à jour par un
+administrateur applicatif actif (`ADMIN`) des colonnes `Nom`, `Prenom`, `Email`
+et `DateDeblocageEvaluation`. Cette exception est limitée à ces colonnes et ne
+doit pas conduire à promouvoir les administrateurs en `OWNER`. Le widget trace
+les créations et modifications de comptes dans `JournalAudit`. Voir
+[`migrations/2026-09-21-c12-utilisateurs-acl.md`](migrations/2026-09-21-c12-utilisateurs-acl.md)
+pour la configuration et la recette.

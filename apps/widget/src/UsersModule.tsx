@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import { libellesRoles, RoleUtilisateur } from "./portal-data.js";
+import { libellesRoles, RoleUtilisateur, UtilisateurCourant } from "./portal-data.js";
 import {
   chargerDonneesUtilisateurs,
   DonneesUtilisateurs,
@@ -13,7 +13,7 @@ type EtatModule =
   | { statut: "erreur"; message: string }
   | { statut: "pret"; donnees: DonneesUtilisateurs };
 
-export function ModuleUtilisateurs({ utilisateurCourantId }: { utilisateurCourantId: number }) {
+export function ModuleUtilisateurs({ utilisateurCourant }: { utilisateurCourant: UtilisateurCourant }) {
   const [etat, setEtat] = useState<EtatModule>({ statut: "chargement" });
   const [tentative, setTentative] = useState(0);
   const [recherche, setRecherche] = useState("");
@@ -69,7 +69,7 @@ export function ModuleUtilisateurs({ utilisateurCourantId }: { utilisateurCouran
     event.preventDefault();
     if (!saisie) return;
     const profilExistant = saisie.id ? donnees.utilisateurs.find((utilisateur) => utilisateur.id === saisie.id) : null;
-    if (saisie.id === utilisateurCourantId && (!saisie.actif || saisie.role !== profilExistant?.role)) {
+    if (saisie.id === utilisateurCourant.id && (!saisie.actif || saisie.role !== profilExistant?.role)) {
       setMessage({ type: "erreur", texte: "Vous ne pouvez pas désactiver votre propre compte ni modifier votre propre rôle." });
       return;
     }
@@ -81,7 +81,7 @@ export function ModuleUtilisateurs({ utilisateurCourantId }: { utilisateurCouran
     setEnregistrement(true);
     setMessage(null);
     try {
-      await enregistrerUtilisateur(saisie);
+      await enregistrerUtilisateur(saisie, utilisateurCourant);
       setSaisie(null);
       setMessage({ type: "succes", texte: saisie.id ? "Le compte a été mis à jour." : "Le compte a été créé." });
       setTentative((valeur) => valeur + 1);
@@ -116,7 +116,7 @@ export function ModuleUtilisateurs({ utilisateurCourantId }: { utilisateurCouran
 
       <div className={saisie ? "corps-utilisateurs avec-formulaire" : "corps-utilisateurs"}>
         <ListeUtilisateurs utilisateurs={utilisateursFiltres} editer={commencerEdition} />
-        {saisie && <FormulaireUtilisateur saisie={saisie} setSaisie={setSaisie} donnees={donnees} soumettre={soumettre} fermer={() => setSaisie(null)} enregistrement={enregistrement} estProfilCourant={saisie.id === utilisateurCourantId} />}
+        {saisie && <FormulaireUtilisateur saisie={saisie} setSaisie={setSaisie} donnees={donnees} soumettre={soumettre} fermer={() => setSaisie(null)} enregistrement={enregistrement} estProfilCourant={saisie.id === utilisateurCourant.id} />}
       </div>
     </section>
   );
