@@ -49,3 +49,11 @@ doit pas conduire à promouvoir les administrateurs en `OWNER`. Le widget trace
 les créations et modifications de comptes dans `JournalAudit`. Voir
 [`migrations/2026-09-21-c12-utilisateurs-acl.md`](migrations/2026-09-21-c12-utilisateurs-acl.md)
 pour la configuration et la recette.
+
+## Migration C-13 — paramétrages locaux des périmètres
+
+Le menu superviseur `Paramétrage des indicateurs` utilise désormais
+`ParametragesPerimetres` et ne doit pas ouvrir les commandes du référentiel
+central. Les droits d’écriture du superviseur sont limités à `Actif` dans ses
+périmètres autorisés. Voir
+[`migrations/2026-09-21-c13-parametrages-perimetres-acl.md`](migrations/2026-09-21-c13-parametrages-perimetres-acl.md).
