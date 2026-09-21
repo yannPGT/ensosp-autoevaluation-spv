@@ -35,3 +35,7 @@ Les ACL Grist doivent être adaptées et testées avant mise en production. Le w
 - la création d'une nouvelle `Evaluation` après une évaluation validée doit être refusée tant que le déblocage n'a pas été autorisé selon la règle métier. Cette interdiction doit être portée par les ACL/formules Grist adaptées au document et ne doit pas reposer uniquement sur le contrôle du widget.
 
 La recette C-03 n'est considérée complète qu'après vérification de ces ACL avec au minimum un compte Recruteur, un compte Superviseur de son périmètre et un Superviseur hors périmètre.
+
+## Migration C-11 — ACL de Validations
+
+La table `Validations` ne doit pas conserver de règle générale accordant tous les droits à un Superviseur actif. Supprimer la règle `user.Profil.Actif and user.Profil.Role == "SUPERVISEUR"` et appliquer la politique détaillée documentée dans [`migrations/2026-09-21-c11-validations-acl.md`](migrations/2026-09-21-c11-validations-acl.md). La recette doit couvrir les lectures et créations hors périmètre, le faux auteur, l'action étrangère et les décisions incohérentes.
