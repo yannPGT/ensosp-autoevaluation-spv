@@ -145,6 +145,24 @@ describe("données recruteur et superviseur", () => {
     expect(applyUserActions.mock.calls[1]![0][1][3]).toMatchObject({Statut:"PROGRESSION_VALIDEE",NiveauCourant:"VERT"});
   });
 
+  it.each([
+    ["REFUSEE", "ROUGE", "Refus motivé"],
+    ["COMPLEMENT_DEMANDE", null, "Merci de préciser la procédure appliquée"],
+  ] as const)("enregistre atomiquement le commentaire d’une décision %s",async(decision,nouveau,commentaire)=>{
+    const applyUserActions=vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{applyUserActions,fetchTable:vi.fn()}}});
+    const action={id:30,uid:"ACT-30",recruteurId:3,perimetreId:1,ficheVersionId:null,priseEnCompteFiche:false,niveauCourant:"ORANGE"} as Parameters<typeof deciderAction>[0];
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+
+    await deciderAction(action,decision,nouveau,commentaire,superviseur);
+
+    expect(applyUserActions).toHaveBeenCalledOnce();
+    const lot=applyUserActions.mock.calls[0]![0];
+    expect(lot).toHaveLength(2);
+    expect(lot[0]).toMatchObject(["AddRecord","Validations",null,{Decision:decision,Commentaire:commentaire}]);
+    expect(lot[1]).toMatchObject(["UpdateRecord","ActionsProgres",30,{CommentaireSuperviseur:commentaire}]);
+  });
+
   it("rattache ultérieurement une fiche publiée avec une trace d’audit",async()=>{
     const applyUserActions=vi.fn().mockResolvedValue(undefined);
     const fetchTable=vi.fn(async(table:string)=>table==="ActionsProgres"
