@@ -107,7 +107,7 @@ export function App() {
               recharger={() => setTentativeTableau((valeur) => valeur + 1)}
             />
           )}
-          {pageActive === "utilisateurs" && <ModuleUtilisateurs utilisateurCourantId={utilisateur.id} />}
+          {pageActive === "utilisateurs" && <ModuleUtilisateurs utilisateurCourant={utilisateur} />}
           {pageActive === "territoires" && <ModuleTerritoires />}
           {pageActive === "affectations" && <ModuleAffectations />}
           {pageActive === "referentiel" && <ModuleReferentiel />}
