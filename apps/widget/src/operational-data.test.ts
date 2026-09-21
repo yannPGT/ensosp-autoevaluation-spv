@@ -24,6 +24,17 @@ describe("données recruteur et superviseur", () => {
     expect(d.fiches[0]).toMatchObject({ titre: "Bien accueillir", codeIndicateur: "IND_01", niveau: "ROUGE", version: "1.1", versionId: 40 });
   });
 
+  it("rattache chaque décision à l’indicateur et à la version de l’action", () => {
+    const d = construireDonneesOperationnelles(
+      { id: [2, 3], Prenom: ["Camille", "Morgan"], Nom: ["DURAND", "ROBERT"], Email: ["c@x", "m@x"], Role: ["SUPERVISEUR", "RECRUTEUR"], PerimetrePrincipal: [1, 1], Actif: [true, true] },
+      { id: [1], Nom: ["Nord"] }, { id: [] }, { id: [] }, { id: [20], Code: ["IND_02"], Titre: ["Premier accueil"] },
+      { id: [30], Recruteur: [3], Perimetre: [1], Indicateur: [20], NiveauInitial: ["ORANGE"], NiveauCourant: ["VERT"], FicheVersion: [40] },
+      { id: [70], ActionProgres: [30], Recruteur: [3], Superviseur: [2], Decision: ["VALIDEE"], AncienNiveau: ["ORANGE"], NouveauNiveau: ["VERT"], DateDecision: [1_750_000_000] },
+      { id: [40], Fiche: [50], NumeroVersion: ["1.1"], EstPubliee: [true] }, { id: [50], Titre: ["Qualité du premier accueil"] }, { id: [] },
+    );
+    expect(d.validations[0]).toMatchObject({ ancienNiveau: "ORANGE", codeIndicateur: "IND_02", indicateur: "Premier accueil", version: "1.1", superviseur: "Camille DURAND" });
+  });
+
   it("ouvre le catalogue seulement après une évaluation complète et validée", () => {
     const base = { id: 1, uid: "E", recruteurId: 3, recruteur: "Morgan", perimetre: "Nord", dateDebut: "—", dateValidation: "—", dateValidationTimestamp: 0, reponses: [] } as const;
     expect(peutConsulterFiches([{ ...base, statut: "BROUILLON", progression: 100 }], 3)).toBe(false);
@@ -159,8 +170,8 @@ describe("données recruteur et superviseur", () => {
     expect(applyUserActions).toHaveBeenCalledOnce();
     const lot=applyUserActions.mock.calls[0]![0];
     expect(lot).toHaveLength(2);
-    expect(lot[0]).toMatchObject(["AddRecord","Validations",null,{Decision:decision,Commentaire:commentaire}]);
-    expect(lot[1]).toMatchObject(["UpdateRecord","ActionsProgres",30,{CommentaireSuperviseur:commentaire}]);
+    expect(lot[0]).toMatchObject(["AddRecord","Validations",null,{Decision:decision,AncienNiveau:"ORANGE",Commentaire:commentaire}]);
+    expect(lot[1]).toMatchObject(["UpdateRecord","ActionsProgres",30,{NiveauCourant:nouveau??"ORANGE",CommentaireSuperviseur:commentaire}]);
   });
 
   it("rattache ultérieurement une fiche publiée avec une trace d’audit",async()=>{
