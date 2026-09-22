@@ -3,7 +3,16 @@ import { UtilisateurCourant } from "./portal-data.js";
 
 export interface ParametreApplication { id:number; cle:string; valeur:string; description:string; updatedAt:string; updatedBy:string; }
 
-export async function chargerParametres():Promise<readonly ParametreApplication[]>{const api=obtenirDocApiGrist();if(!api)return construireParametres(demoParametres());return construireParametres(await api.fetchTable("Parametres"));}
+const valeursParDefaut:Record<string,string>={APP_NAME:"Auto-évaluation des pratiques de recrutement SPV",APP_LOCALE:"fr-FR",APP_TIMEZONE:"Europe/Paris",PDF_MAX_SIZE_MB:"10"};
+let parametresActifs={...valeursParDefaut};
+export function configurerParametres(parametres:readonly ParametreApplication[]):void{parametresActifs={...valeursParDefaut};parametres.forEach(p=>{if(Object.prototype.hasOwnProperty.call(parametresActifs,p.cle))parametresActifs[p.cle]=p.valeur.trim()||valeursParDefaut[p.cle]!;});}
+export function parametre(cle:string):string{return parametresActifs[cle]??"";}
+export function nomApplication():string{return parametre("APP_NAME");}
+export function localeApplication():string{return parametre("APP_LOCALE");}
+export function fuseauApplication():string{return parametre("APP_TIMEZONE");}
+export function taillePdfMaxMo():number{return Math.min(50,Math.max(1,Number(parametre("PDF_MAX_SIZE_MB"))||10));}
+
+export async function chargerParametres():Promise<readonly ParametreApplication[]>{const api=obtenirDocApiGrist();const resultat=!api?construireParametres(demoParametres()):construireParametres(await api.fetchTable("Parametres"));configurerParametres(resultat);return resultat;}
 export function construireParametres(table:TableGrist):ParametreApplication[]{return(table.id??[]).flatMap((v,i)=>{const id=nombre(v);if(!id)return[];return[{id,cle:texte(table.Cle?.[i]),valeur:texte(table.Valeur?.[i]),description:texte(table.Description?.[i]),updatedAt:dateHeure(table.UpdatedAt?.[i]),updatedBy:texte(table.UpdatedByEmail?.[i])||"—"}];}).sort((a,b)=>a.cle.localeCompare(b.cle,"fr"));}
 export async function enregistrerParametre(p:ParametreApplication,valeur:string,description:string,u:UtilisateurCourant):Promise<void>{const api=obtenirDocApiGrist();if(!api)throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");if(contientSecret(p.cle,description))throw new Error("Les paramètres ne doivent contenir ni secret, ni mot de passe, ni jeton d’accès.");await api.applyUserActions([["UpdateRecord","Parametres",p.id,{Valeur:valeur.trim(),Description:description.trim()}],["AddRecord","JournalAudit",null,{Uid:crypto.randomUUID(),Acteur:u.id,TypeObjet:"PARAMETRE",ObjetUid:p.cle,Action:"MODIFICATION",Resume:`Paramètre ${p.cle} mis à jour`}]]);}
 export function validerValeur(cle:string,valeur:string):string|null{const v=valeur.trim();if(!v)return"La valeur ne peut pas être vide.";if(cle==="PDF_MAX_SIZE_MB"&&(!/^\d+$/.test(v)||Number(v)<1||Number(v)>50))return"La taille PDF doit être comprise entre 1 et 50 Mo.";if(cle==="APP_LOCALE"&&!/^[a-z]{2}-[A-Z]{2}$/.test(v))return"Le format attendu est de type fr-FR.";if(cle==="APP_TIMEZONE"&&!v.includes("/"))return"Utilisez un fuseau de type Europe/Paris.";if(cle==="SCHEMA_VERSION"&&!/^\d+\.\d+\.\d+$/.test(v))return"La version du schéma doit respecter le format 1.0.0.";return null;}

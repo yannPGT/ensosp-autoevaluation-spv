@@ -14,6 +14,7 @@ import { ModuleParametres } from "./SettingsModule.js";
 import { ModuleAudit } from "./AuditModule.js";
 import { ModuleOperationnel } from "./OperationalModule.js";
 import { ModuleParametrage } from "./ParametrageModule.js";
+import { chargerParametres, nomApplication } from "./settings-data.js";
 import {
   EntreeMenu,
   libellesRoles,
@@ -34,6 +35,7 @@ const libellesNiveaux: Record<Niveau, string> = {
 };
 
 export function App() {
+  const [nom, setNom] = useState(nomApplication());
   const [etatUtilisateur, setEtatUtilisateur] = useState<
     { statut: "chargement" } |
     { statut: "pret"; utilisateur: UtilisateurCourant } |
@@ -52,6 +54,10 @@ export function App() {
     libelle: "Accueil",
     description: "Vue d’ensemble de votre espace personnel.",
   };
+
+  useEffect(() => {
+    chargerParametres().then(() => setNom(nomApplication())).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     let actif = true;
@@ -88,7 +94,7 @@ export function App() {
 
   return (
     <main>
-      <Bandeau utilisateur={utilisateur} />
+      <Bandeau utilisateur={utilisateur} nomApplication={nom} />
       <div className="application-shell">
         <MenuNavigation menu={menu} pageActive={pageActive} changerPage={setPageActive} />
         <div className="contenu-application">
@@ -153,12 +159,12 @@ function EcranConnexion({ titre, message, reessayer }: { titre: string; message:
   );
 }
 
-function Bandeau({ utilisateur }: { utilisateur: UtilisateurCourant }) {
+function Bandeau({ utilisateur, nomApplication }: { utilisateur: UtilisateurCourant; nomApplication: string }) {
   return (
     <header>
       <span className="badge-beta">Bêta</span>
       <p className="marque">ENSOSP <span>· {utilisateur.prenom} {utilisateur.nom}</span></p>
-      <h1>Auto-évaluation des pratiques de recrutement SPV</h1>
+      <h1>{nomApplication}</h1>
       <div className="contexte-utilisateur" aria-label="Informations de l’utilisateur connecté">
         <span>{libellesRoles[utilisateur.role]}</span>
         <span>{utilisateur.perimetrePrincipal}</span>

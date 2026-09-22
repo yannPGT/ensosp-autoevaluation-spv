@@ -1,5 +1,6 @@
 import { obtenirDocApiGrist, TableGrist } from "./grist-context.js";
 import { RoleUtilisateur, UtilisateurCourant } from "./portal-data.js";
+import { fuseauApplication, localeApplication } from "./settings-data.js";
 
 export interface CarteTableauDeBord {
   valeur: string;
@@ -407,7 +408,7 @@ function debutAujourdhui(): number {
 
 function dateFr(valeur: unknown): string {
   const valeurTemps = temps(valeur);
-  return valeurTemps ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(valeurTemps) : "Non renseignée";
+  return valeurTemps ? new Intl.DateTimeFormat(localeApplication(), { dateStyle: "medium", timeZone: fuseauApplication() }).format(valeurTemps) : "Non renseignée";
 }
 
 function temps(valeur: unknown): number {
