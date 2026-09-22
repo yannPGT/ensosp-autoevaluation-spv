@@ -130,6 +130,18 @@ describe("construireTableauDeBord", () => {
     expect(carte(tableau, "Fiches publiées").valeur).toBe("1");
     expect(tableau.lignes[0]?.titre).toBe("Groupement Nord");
   });
+
+  it("conserve le bilan initial et calcule le niveau courant par axe", () => {
+    const tableau = construireTableauDeBord(baseUtilisateur, {
+      Evaluations: { id: [10], Recruteur: [7], Statut: ["VALIDEE"], DateValidation: [1_700_000_000] },
+      Reponses: { id: [1, 2], Evaluation: [10, 10], Indicateur: [101, 102], Niveau: ["ROUGE", "ORANGE"] },
+      ActionsProgres: { id: [20], Recruteur: [7], Reponse: [1], NiveauCourant: ["VERT"], Statut: ["PROGRESSION_VALIDEE"], Echeance: [4_102_444_800] },
+      Indicateurs: { id: [101, 102], Code: ["IND_01", "IND_02"], Titre: ["Contact", "Accueil"], Axe: [201, 201], Actif: [true, true] },
+      Axes: { id: [201], Titre: ["Axe 1"] },
+    });
+    expect(tableau.synthesesAxes).toEqual([{ axe: "Axe 1", initial: { rouge: 1, orange: 1, vert: 0 }, courant: { rouge: 0, orange: 1, vert: 1 } }]);
+    expect(tableau.lignesPilotage?.find((l) => l.code === "IND_01")).toMatchObject({ initial: "ROUGE", courant: "VERT", statut: "PROGRESSION_VALIDEE" });
+  });
 });
 
 function carte(tableau: ReturnType<typeof construireTableauDeBord>, libelle: string) {

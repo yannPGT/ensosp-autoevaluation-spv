@@ -32,6 +32,11 @@ export interface SuiviPedagogiqueIndicateur {
   total: number;
   echantillon: number;
 }
+export interface LignePilotage {
+  recruteur: string; perimetre: string; axe: string; code: string; indicateur: string;
+  initial: string; courant: string; statut: string; echeance: string; echeanceTimestamp: number; retard: boolean;
+}
+export interface SyntheseAxe { axe: string; initial: { rouge:number; orange:number; vert:number }; courant: { rouge:number; orange:number; vert:number }; }
 
 export interface TableauDeBord {
   cartes: readonly CarteTableauDeBord[];
@@ -41,6 +46,8 @@ export interface TableauDeBord {
   personnel: readonly PersonnelTableauDeBord[];
   suiviPedagogique?: readonly SuiviPedagogiqueIndicateur[];
   note?: string;
+  lignesPilotage?: readonly LignePilotage[];
+  synthesesAxes?: readonly SyntheseAxe[];
 }
 
 const STATUTS_ACTION_FERMEE = new Set(["PROGRESSION_VALIDEE", "ARCHIVEE"]);
@@ -109,6 +116,7 @@ function tableauRecruteur(utilisateur: UtilisateurCourant, tables: Record<string
       })),
     personnel: [],
     note: "La répartition affiche le niveau courant de vos 13 indicateurs. L’évaluation initiale reste conservée dans l’historique.",
+    ...construirePilotage(reponses, actions, lignes(tables.Indicateurs), lignes(tables.Axes), utilisateur),
   };
 }
 
@@ -152,6 +160,7 @@ function tableauSuperviseur(tables: Record<string, TableGrist>): TableauDeBord {
     }),
     personnel,
     note: "Les résultats agrègent le niveau courant des indicateurs issus de la dernière évaluation validée de chaque recruteur visible.",
+    ...construirePilotage(reponses, actions, lignes(tables.Indicateurs), lignes(tables.Axes), undefined),
   };
 }
 
@@ -209,14 +218,15 @@ function tableauAdministrateur(tables: Record<string, TableGrist>): TableauDeBor
       })),
     personnel,
     note: "La consolidation utilise le niveau courant des indicateurs de la dernière évaluation validée de chaque recruteur, sans classement ni note globale.",
+    ...construirePilotage(reponses, actions, lignes(tables.Indicateurs), lignes(tables.Axes), undefined),
   };
 }
 
 function tablesPourRole(role: RoleUtilisateur): string[] {
-  const communes = ["Evaluations", "Reponses", "ActionsProgres"];
+  const communes = ["Evaluations", "Reponses", "ActionsProgres", "Indicateurs", "Axes"];
   if (role === "RECRUTEUR") return communes;
-  if (role === "SUPERVISEUR") return [...communes, "Utilisateurs", "Perimetres", "Indicateurs"];
-  return [...communes, "Utilisateurs", "Perimetres", "Indicateurs", "FichesEnseignement"];
+  if (role === "SUPERVISEUR") return [...communes, "Utilisateurs", "Perimetres", "Indicateurs", "Axes"];
+  return [...communes, "Utilisateurs", "Perimetres", "Indicateurs", "Axes", "FichesEnseignement"];
 }
 
 function construirePersonnel(
@@ -253,7 +263,7 @@ function construirePersonnel(
 function tablesVides(): Record<string, TableGrist> {
   return {
     Evaluations: { id: [] }, Reponses: { id: [] }, ActionsProgres: { id: [] },
-    Utilisateurs: { id: [] }, Perimetres: { id: [] }, Indicateurs: { id: [] }, FichesEnseignement: { id: [] },
+    Utilisateurs: { id: [] }, Perimetres: { id: [] }, Indicateurs: { id: [] }, Axes: { id: [] }, FichesEnseignement: { id: [] },
   };
 }
 
@@ -263,6 +273,24 @@ function lignes(table: TableGrist | undefined): Record<string, unknown>[] {
   return Array.from({ length: total }, (_, index) => Object.fromEntries(
     Object.entries(table).map(([colonne, valeurs]) => [colonne, valeurs[index]]),
   ));
+}
+
+function construirePilotage(
+  reponses: Record<string, unknown>[], actions: Record<string, unknown>[], indicateurs: Record<string, unknown>[] = [], axes: Record<string, unknown>[] = [], utilisateur?: UtilisateurCourant,
+): Pick<TableauDeBord, "lignesPilotage" | "synthesesAxes"> {
+  const nomsAxes = new Map(axes.map((a) => [nombre(a.id), texte(a.Titre) || texte(a.Nom) || `Axe ${a.id}`]));
+  const infos = new Map(indicateurs.map((i) => [nombre(i.id), { code: texte(i.Code), titre: texte(i.Titre), axe: nomsAxes.get(ref(i.Axe)) || "Axe non renseigné" }]));
+  const courantParReponse = niveauxCourantsParReponse(actions);
+  const actionParReponse = new Map<number, Record<string, unknown>>();
+  actions.forEach((a) => { const id = ref(a.Reponse); if (id && (!actionParReponse.has(id) || choix(a.Statut) === "PROGRESSION_VALIDEE")) actionParReponse.set(id, a); });
+  const lignesPilotage: LignePilotage[] = reponses.flatMap((r) => {
+    const info = infos.get(ref(r.Indicateur)); if (!info) return [];
+    const action = actionParReponse.get(nombre(r.id) ?? 0); const echeanceTimestamp = temps(action?.Echeance); const initial = choix(r.Niveau); const courant = courantParReponse.get(nombre(r.id) ?? 0)?.niveau || initial;
+    return [{ recruteur: utilisateur?.nom || "Recruteur suivi", perimetre: utilisateur?.perimetrePrincipal || "Périmètre autorisé", axe: info.axe, code: info.code, indicateur: info.titre || info.code, initial, courant, statut: choix(action?.Statut) || "NON DÉCLARÉ", echeance: echeanceTimestamp ? dateFr(action?.Echeance) : "Sans échéance", echeanceTimestamp, retard: Boolean(echeanceTimestamp && echeanceTimestamp < debutAujourdhui()) }];
+  });
+  const groupes = new Map<string, SyntheseAxe>();
+  lignesPilotage.forEach((l) => { const g = groupes.get(l.axe) ?? { axe: l.axe, initial: { rouge: 0, orange: 0, vert: 0 }, courant: { rouge: 0, orange: 0, vert: 0 } }; if (l.initial.toLowerCase() in g.initial) g.initial[l.initial.toLowerCase() as keyof typeof g.initial]++; if (l.courant.toLowerCase() in g.courant) g.courant[l.courant.toLowerCase() as keyof typeof g.courant]++; groupes.set(l.axe, g); });
+  return { lignesPilotage, synthesesAxes: [...groupes.values()].sort((a, b) => a.axe.localeCompare(b.axe, "fr")) };
 }
 
 function dernieresEvaluationsValidees(evaluations: Record<string, unknown>[]): Record<string, unknown>[] {

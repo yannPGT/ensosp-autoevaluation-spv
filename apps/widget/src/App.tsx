@@ -1,7 +1,8 @@
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { chargerTableauDeBord, PersonnelTableauDeBord, TableauDeBord } from "./dashboard-data.js";
-import { axesEvaluation, indicateursEvaluation, Niveau } from "./evaluation-data.js";
+import { chargerTableauDeBord, LignePilotage, PersonnelTableauDeBord, SyntheseAxe, TableauDeBord } from "./dashboard-data.js";
+import { Niveau } from "./evaluation-data.js";
 import { chargerSessionEvaluation, creerEvaluation, enregistrerReponse, validerEvaluation } from "./evaluation-store.js";
+import { indicateursQuestionnaire, questionnaireHistorique, QuestionnaireDefinition } from "./questionnaire-data.js";
 import { compterReponsesNonEnregistrees, messageEchecSauvegarde } from "./questionnaire-state.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import { ModuleUtilisateurs } from "./UsersModule.js";
@@ -128,7 +129,7 @@ export function App() {
           )}
           {pageActive === "resultats" && (
             etapeEvaluation === "BILAN"
-              ? <Bilan reponses={reponses} modifier={() => { setEtapeEvaluation("FINALISEE"); setPageActive("evaluation"); }} />
+              ? <Bilan questionnaire={questionnaireHistorique()} reponses={reponses} modifier={() => { setEtapeEvaluation("FINALISEE"); setPageActive("evaluation"); }} />
               : <ModuleOperationnel page="resultats" utilisateur={utilisateur} />
           )}
           {!(["accueil", "profil", "tableau-bord", "utilisateurs", "territoires", "affectations", "referentiel", "pedagogie", "parametres", "audit-exports", "evaluation", "resultats", "progression", "fiches", "historique", "recruteurs", "evaluations-recruteurs", "progres-a-valider", "progres-ouverts", "echeances", "gestion-recruteurs", "parametrage-indicateurs"].includes(pageActive)) && (
@@ -163,7 +164,7 @@ function Bandeau({ utilisateur }: { utilisateur: UtilisateurCourant }) {
         <span>{utilisateur.perimetrePrincipal}</span>
         {utilisateur.role === "RECRUTEUR" && <span>Superviseur : {utilisateur.superviseurNom}</span>}
       </div>
-      <p>13 indicateurs · 3 axes · vos données restent protégées par Grist</p>
+      <p>Questionnaire administrable · vos données restent protégées par Grist</p>
       <p className="version-widget">Version 1.0 · © YannPGT</p>
     </header>
   );
@@ -278,6 +279,7 @@ function ContenuTableauDeBord({ etat, recharger, afficherPersonnel = false }: {
       {afficherPersonnel && tableau.suiviPedagogique && (
         <SuiviPedagogique lignes={tableau.suiviPedagogique} />
       )}
+      {tableau.lignesPilotage && <FiltresPilotage lignes={tableau.lignesPilotage} axes={tableau.synthesesAxes || []} />}
       {afficherPersonnel && <PersonnelSuivi personnel={tableau.personnel} />}
       {tableau.titreSuivi && (
         <section className="bloc-tableau" aria-labelledby="titre-suivi">
@@ -296,6 +298,13 @@ function ContenuTableauDeBord({ etat, recharger, afficherPersonnel = false }: {
       {tableau.note && <p className="note-tableau">{tableau.note}</p>}
     </>
   );
+}
+
+function FiltresPilotage({ lignes, axes }: { lignes: readonly LignePilotage[]; axes: readonly SyntheseAxe[] }) {
+  const [axe, setAxe] = useState("TOUS"); const [indicateur, setIndicateur] = useState("TOUS"); const [niveau, setNiveau] = useState("TOUS"); const [statut, setStatut] = useState("TOUS"); const [echeance, setEcheance] = useState("TOUS"); const [retard, setRetard] = useState("TOUS");
+  const liste = lignes.filter((l) => (axe === "TOUS" || l.axe === axe) && (indicateur === "TOUS" || l.indicateur === indicateur) && (niveau === "TOUS" || l.courant === niveau) && (statut === "TOUS" || l.statut === statut) && (echeance === "TOUS" || (echeance === "AVEC" ? l.echeanceTimestamp > 0 : l.echeanceTimestamp === 0)) && (retard === "TOUS" || (retard === "OUI" ? l.retard : !l.retard)));
+  const options = (cle: "axe" | "indicateur" | "statut") => [...new Set(lignes.map((l) => l[cle]))].filter(Boolean).sort((a, b) => a.localeCompare(b, "fr"));
+  return <section className="bloc-tableau" aria-labelledby="titre-filtres-pilotage"><h3 id="titre-filtres-pilotage" className="titre-section">Analyse détaillée des résultats</h3><div className="filtres-personnel filtres-pilotage"><label>Axe<select value={axe} onChange={(e) => setAxe(e.target.value)}><option value="TOUS">Tous</option>{options("axe").map((x) => <option key={x}>{x}</option>)}</select></label><label>Indicateur<select value={indicateur} onChange={(e) => setIndicateur(e.target.value)}><option value="TOUS">Tous</option>{options("indicateur").map((x) => <option key={x}>{x}</option>)}</select></label><label>Niveau courant<select value={niveau} onChange={(e) => setNiveau(e.target.value)}><option value="TOUS">Tous</option>{["ROUGE", "ORANGE", "VERT"].map((x) => <option key={x}>{x}</option>)}</select></label><label>Statut<select value={statut} onChange={(e) => setStatut(e.target.value)}><option value="TOUS">Tous</option>{options("statut").map((x) => <option key={x}>{x}</option>)}</select></label><label>Échéance<select value={echeance} onChange={(e) => setEcheance(e.target.value)}><option value="TOUS">Toutes</option><option value="AVEC">Avec échéance</option><option value="SANS">Sans échéance</option></select></label><label>Retard<select value={retard} onChange={(e) => setRetard(e.target.value)}><option value="TOUS">Tous</option><option value="OUI">En retard</option><option value="NON">À l’heure</option></select></label></div><p className="note-tableau">{liste.length} résultat{liste.length > 1 ? "s" : ""} · niveaux initiaux conservés séparément des niveaux courants</p><div className="table-personnel"><div className="ligne-personnel ligne-personnel-entete"><span>Axe / indicateur</span><span>Initial</span><span>Courant</span><span>Statut</span><span>Échéance</span></div>{liste.map((l, i) => <article className="ligne-personnel" key={`${l.code}-${i}`}><div><strong>{l.code}</strong><small>{l.axe} · {l.indicateur}</small></div><span className={`badge niveau-${l.initial.toLowerCase()}`}>{l.initial}</span><span className={`badge niveau-${l.courant.toLowerCase()}`}>{l.courant}</span><span>{l.statut.replaceAll("_", " ")}</span><span>{l.retard ? "En retard" : l.echeance}</span></article>)}</div><h4 className="titre-section">Synthèse par axe</h4><div className="table-personnel">{axes.map((a) => <article className="ligne-personnel" key={a.axe}><div><strong>{a.axe}</strong><small>Bilan initial → niveau courant</small></div><span>R {a.initial.rouge} · O {a.initial.orange} · V {a.initial.vert}</span><span>R {a.courant.rouge} · O {a.courant.orange} · V {a.courant.vert}</span></article>)}</div></section>;
 }
 
 function SuiviPedagogique({ lignes }: { lignes: NonNullable<TableauDeBord["suiviPedagogique"]> }) {
@@ -418,6 +427,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   setEtape: (etape: EtapeEvaluation) => void;
 }) {
   const [evaluationId, setEvaluationId] = useState<number | null>(null);
+  const [questionnaire, setQuestionnaire] = useState<QuestionnaireDefinition | null>(null);
   const [reponsesSauvegardees, setReponsesSauvegardees] = useState<Record<string, Niveau>>({});
   const [etatSauvegarde, setEtatSauvegarde] = useState("Chargement du brouillon…");
   const [erreurSauvegarde, setErreurSauvegarde] = useState("");
@@ -433,6 +443,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     chargerSessionEvaluation(utilisateur).then((session) => {
       if (!actif) return;
       setEvaluationId(session.evaluationId);
+      setQuestionnaire(session.questionnaire);
       setReponses(session.reponses);
       setReponsesSauvegardees(session.reponses);
       setSessionChargee(true);
@@ -451,6 +462,8 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     });
     return () => { actif = false; };
   }, [utilisateur, setReponses, setEtape]);
+
+  const indicateurs = questionnaire ? indicateursQuestionnaire(questionnaire) : [];
 
   const reponsesNonEnregistrees = sessionChargee && Object.entries(reponses)
     .some(([code, niveau]) => reponsesSauvegardees[code] !== niveau);
@@ -497,7 +510,8 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     }
   };
 
-  if (etape === "BILAN") return <Bilan reponses={reponses} modifier={() => setEtape("FINALISEE")} />;
+  if (!sessionChargee || !questionnaire) return <section className="page-carte"><p>Chargement du questionnaire depuis le référentiel Grist…</p></section>;
+  if (etape === "BILAN") return <Bilan questionnaire={questionnaire} reponses={reponses} modifier={() => setEtape("FINALISEE")} />;
   if (etape === "FINALISEE") {
     const contact = utilisateur.superviseurNom && utilisateur.superviseurNom !== "Non renseigné"
       ? utilisateur.superviseurNom
@@ -520,7 +534,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
 
   const nombreReponses = Object.keys(reponsesSauvegardees).length;
   const nombreReponsesNonEnregistrees = compterReponsesNonEnregistrees(reponses, reponsesSauvegardees);
-  const nombreRestant = indicateursEvaluation.length - nombreReponses;
+  const nombreRestant = indicateurs.length - nombreReponses;
   const complet = nombreRestant === 0;
 
   const reessayerSauvegarde = async () => {
@@ -593,10 +607,10 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
           <h2 id="questionnaire">Décrivez votre pratique actuelle</h2>
           <p>Pour chaque indicateur, sélectionnez la situation qui correspond le mieux à votre pratique. Votre résultat ne sera révélé qu’au bilan.</p>
         </div>
-        <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateursEvaluation.length}<span>réponses enregistrées</span></p>
+        <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateurs.length}<span>réponses enregistrées</span></p>
       </div>
       <form onSubmit={valider}>
-        {axesEvaluation.map((axe, axeIndex) => (
+        {questionnaire.axes.map((axe, axeIndex) => (
           <section className="axe" aria-labelledby={`titre-${axe.code}`} key={axe.code}>
             <div className="axe-titre"><span>Axe {axeIndex + 1}</span><h3 id={`titre-${axe.code}`}>{axe.titre}</h3></div>
             {axe.indicateurs.map((indicateur) => (
@@ -632,7 +646,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   );
 }
 
-function Bilan({ reponses, modifier }: { reponses: Record<string, Niveau>; modifier: () => void }) {
+function Bilan({ questionnaire, reponses, modifier }: { questionnaire: QuestionnaireDefinition; reponses: Record<string, Niveau>; modifier: () => void }) {
   const total = Object.values(reponses).reduce((acc, niveau) => {
     acc[niveau] += 1;
     return acc;
@@ -646,7 +660,7 @@ function Bilan({ reponses, modifier }: { reponses: Record<string, Niveau>; modif
         <article className="niveau-vert"><strong>{total.VERT}</strong><span>Points d’appui verts</span></article>
       </div>
       <div className="liste-suivi">
-        {indicateursEvaluation.map((indicateur) => {
+        {indicateursQuestionnaire(questionnaire).map((indicateur) => {
           const niveau = reponses[indicateur.code];
           return <article key={indicateur.code}><div><strong>{indicateur.titre}</strong><span>{niveau ? libellesNiveaux[niveau] : "Non renseigné"}</span></div><b>{niveau ?? "—"}</b></article>;
         })}
