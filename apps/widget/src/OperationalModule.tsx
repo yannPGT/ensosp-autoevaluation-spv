@@ -10,6 +10,7 @@ import {
   debloquerEvaluationRecruteur,
   definirEcheance,
   demarrerAction,
+  rouvrirAction,
   DonneesOperationnelles,
   FicheDisponible,
   journaliserConsultation,
@@ -150,7 +151,7 @@ function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
       notifier("erreur", e instanceof Error ? e.message : "La fiche n’a pas pu être ouverte.");
     } finally { setOperation(false); }
   };
-  const modifiable = ["A_PRENDRE_EN_COMPTE", "EN_COURS", "COMPLEMENT_DEMANDE", "VALIDATION_REFUSEE"].includes(a.statut);
+  const modifiable = ["A_PRENDRE_EN_COMPTE", "EN_COURS", "COMPLEMENT_DEMANDE"].includes(a.statut);
   return (
     <article className="carte-action-progres">
       <EnteteAction action={a} />
@@ -162,7 +163,8 @@ function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
       <div className="actions-formulaire">
         {a.statut === "A_PRENDRE_EN_COMPTE" && <button type="button" className="bouton-secondaire" disabled={operation} onClick={() => agir("DEMARRER")}>Commencer l’action</button>}
         {modifiable && <button type="button" disabled={operation || Boolean(a.ficheVersionId && !priseEnCompte)} onClick={() => agir("ENVOYER")}>Demander le passage au vert</button>}
-        {a.statut === "EN_ATTENTE_VALIDATION" && <span>Prise en compte déclarée · demande transmise au superviseur.</span>}
+      {a.statut === "EN_ATTENTE_VALIDATION" && <span>Prise en compte déclarée · demande transmise au superviseur.</span>}
+      {a.statut === "VALIDATION_REFUSEE" && <p className="message-formulaire message-avertissement">Cette action a été refusée par le superviseur. Une correction sera possible après sa réouverture.</p>}
       </div>
     </article>
   );
@@ -263,7 +265,8 @@ function FormDecision({ action: a, utilisateur, notifier, recharger }: { action:
 
 function ActionsOuvertes({ actions, utilisateur, notifier, recharger }: { actions: readonly ActionMetier[]; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void; recharger: () => void }) {
   if (!actions.length) return <Vide texte="Aucun indicateur rouge ou orange n’est encore ouvert." />;
-  return <div className="liste-actions-progres">{actions.map((a) => <article className="carte-action-progres" key={a.id}><EnteteAction action={a} /><p>{a.recruteur} · {a.perimetre}</p><p><strong>Échéance :</strong> {a.echeance}</p><FormEcheance action={a} utilisateur={utilisateur} notifier={notifier} recharger={recharger} /></article>)}</div>;
+  const rouvrir = async (action: ActionMetier) => { try { await rouvrirAction(action, utilisateur); notifier("succes", `L’action ${action.codeIndicateur} est rouverte pour correction.`); recharger(); } catch (e) { notifier("erreur", e instanceof Error ? e.message : "La réouverture n’a pas pu être enregistrée."); } };
+  return <div className="liste-actions-progres">{actions.map((a) => <article className="carte-action-progres" key={a.id}><EnteteAction action={a} /><p>{a.recruteur} · {a.perimetre}</p><p><strong>Échéance :</strong> {a.echeance}</p>{a.statut === "VALIDATION_REFUSEE" && (utilisateur.role === "SUPERVISEUR" || utilisateur.role === "ADMIN") && <button type="button" onClick={() => rouvrir(a)}>Rouvrir pour correction</button>}{a.statut !== "VALIDATION_REFUSEE" && <FormEcheance action={a} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />}</article>)}</div>;
 }
 
 function Echeances({ actions, utilisateur, notifier, recharger }: { actions: readonly ActionMetier[]; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void; recharger: () => void }) {

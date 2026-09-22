@@ -1,11 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chargerDonneesOperationnelles, construireDonneesOperationnelles, deciderAction, declarerProgression, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante } from "./operational-data.js";
+import { chargerDonneesOperationnelles, construireDonneesOperationnelles, deciderAction, declarerProgression, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante, rouvrirAction } from "./operational-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
 
 const utilisateur:UtilisateurCourant={id:3,prenom:"Morgan",nom:"ROBERT",email:"m@x",role:"RECRUTEUR",entite:"SDIS",perimetrePrincipal:"Nord",perimetresSupervises:[],superviseurNom:"Camille",peutGererPedagogie:false,actif:true};
 
 describe("données recruteur et superviseur", () => {
   afterEach(()=>vi.unstubAllGlobals());
+  it("réouvre une action refusée uniquement sur décision superviseur", async () => {
+    const applyUserActions=vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("window",{parent:{},grist:{docApi:{applyUserActions}}});
+    const action={id:30,uid:"A-30",codeIndicateur:"IND_01",statut:"VALIDATION_REFUSEE",perimetreId:1} as Parameters<typeof rouvrirAction>[0];
+    await expect(rouvrirAction(action,{...utilisateur,role:"RECRUTEUR"})).rejects.toThrow(/superviseur/);
+    await rouvrirAction(action,{...utilisateur,id:2,role:"SUPERVISEUR"});
+    expect(applyUserActions).toHaveBeenCalledWith(expect.arrayContaining([
+      ["UpdateRecord","ActionsProgres",30,expect.objectContaining({Statut:"EN_COURS"})],
+      ["AddRecord","JournalAudit",null,expect.objectContaining({Action:"REOUVERTURE_APRES_REFUS"})],
+    ]));
+  });
   it("rattache les actions et le catalogue publié aux indicateurs", () => {
     const d = construireDonneesOperationnelles(
       { id: [3], Prenom: ["Morgan"], Nom: ["ROBERT"], Email: ["m@x"], Role: ["RECRUTEUR"], PerimetrePrincipal: [1], Actif: [true] },
