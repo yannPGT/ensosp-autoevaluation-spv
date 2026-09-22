@@ -15,6 +15,7 @@ import {
   journaliserConsultation,
   urlPieceJointe,
 } from "./operational-data.js";
+import { bilanHtml, feuilleRouteHtml, imprimerPdf, suiviCsv, telechargerTexte } from "./exports-data.js";
 
 type Etat =
   | { statut: "chargement" }
@@ -80,25 +81,27 @@ function Vue({ page, d, utilisateur, notifier, recharger }: {
   notifier: (t: "succes" | "erreur", x: string) => void;
   recharger: () => void;
 }) {
-  if (page === "resultats") return <Resultats d={d} />;
+  if (page === "resultats") return <Resultats d={d} utilisateur={utilisateur} />;
   if (page === "progression") return <Progression actions={d.actions} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
   if (page === "fiches") return <Fiches d={d} utilisateur={utilisateur} notifier={notifier} />;
   if (page === "historique") return <Historique d={d} />;
   if (page === "recruteurs" || page === "gestion-recruteurs") return <Recruteurs d={d} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
-  if (page === "evaluations-recruteurs") return <Evaluations d={d} />;
+  if (page === "evaluations-recruteurs") return <Evaluations d={d} utilisateur={utilisateur} />;
   if (page === "progres-a-valider") return <Validation actions={d.actions.filter((a) => a.statut === "EN_ATTENTE_VALIDATION" || a.statut === "PRISE_EN_COMPTE_DECLAREE")} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
   if (page === "progres-ouverts") return <ActionsOuvertes actions={d.actions.filter((a) => !(["PROGRESSION_VALIDEE", "ARCHIVEE"] as string[]).includes(a.statut) && a.niveauCourant !== "VERT")} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
   if (page === "echeances") return <Echeances actions={d.actions} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
   return null;
 }
 
-function Resultats({ d }: { d: DonneesOperationnelles }) {
+function Resultats({ d, utilisateur }: { d: DonneesOperationnelles; utilisateur: UtilisateurCourant }) {
   const evaluation = d.evaluations.find((e) => e.statut === "VALIDEE");
   if (!evaluation) return <Vide texte="Aucune évaluation validée n’est disponible pour le moment." />;
   const totaux: Record<Niveau, number> = { ROUGE: 0, ORANGE: 0, VERT: 0 };
   evaluation.reponses.forEach((r) => totaux[r.niveau]++);
+  const exporter = () => imprimerPdf("Bilan individuel", bilanHtml(evaluation, utilisateur));
   return (
     <div className="resultats-operationnels">
+      <div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter le bilan en PDF</button></div>
       <div className="synthese">{(["ROUGE", "ORANGE", "VERT"] as Niveau[]).map((n) => <article className={`synthese-carte niveau-${n.toLowerCase()}`} key={n}><strong>{totaux[n]}</strong><span>{n}</span></article>)}</div>
       <p>Évaluation validée le {evaluation.dateValidation} · {evaluation.perimetre}</p>
       <div className="resultats-detail">{evaluation.reponses.map((r) => <article className="resultat" key={r.id}><div><p><strong>{r.codeIndicateur}</strong> — {r.indicateur}</p>{r.commentaire && <small>{r.commentaire}</small>}</div><span className={`badge niveau-${r.niveau.toLowerCase()}`}>{r.niveau}</span></article>)}</div>
@@ -113,7 +116,8 @@ function Progression({ actions, utilisateur, notifier, recharger }: {
   recharger: () => void;
 }) {
   if (!actions.length) return <Vide texte="Aucune action de progression n’est ouverte pour le moment." />;
-  return <div className="liste-actions-progres">{actions.map((a) => <ActionRecruteur key={a.id} action={a} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />)}</div>;
+  const exporter = () => imprimerPdf("Feuille de route", feuilleRouteHtml(actions, utilisateur));
+  return <><div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter la feuille de route en PDF</button></div><div className="liste-actions-progres">{actions.map((a) => <ActionRecruteur key={a.id} action={a} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />)}</div></>;
 }
 
 function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
@@ -230,11 +234,12 @@ function Recruteurs({ d, utilisateur, notifier, recharger }: {
   );
 }
 
-function Evaluations({ d }: { d: DonneesOperationnelles }) {
+function Evaluations({ d, utilisateur }: { d: DonneesOperationnelles; utilisateur: UtilisateurCourant }) {
   const [selection, setSelection] = useState(d.evaluations[0]?.id ?? 0);
   const e = d.evaluations.find((x) => x.id === selection);
   if (!d.evaluations.length) return <Vide texte="Aucune évaluation n’est visible dans vos périmètres." />;
-  return <div className="corps-evaluations-superviseur"><div className="liste-evaluations-superviseur">{d.evaluations.map((x) => <button className={selection === x.id ? "selectionnee" : ""} key={x.id} onClick={() => setSelection(x.id)}><strong>{x.recruteur}</strong><span>{x.statut} · {x.progression}%</span><small>{x.dateValidation !== "—" ? x.dateValidation : x.dateDebut}</small></button>)}</div>{e && <article className="detail-evaluation-superviseur"><h3>{e.recruteur}</h3><p>{e.perimetre} · {e.statut}</p>{e.reponses.map((r) => <div key={r.id}><span><code>{r.codeIndicateur}</code><strong>{r.indicateur}</strong></span><span className={`badge niveau-${r.niveau.toLowerCase()}`}>{r.niveau}</span></div>)}</article>}</div>;
+  const exporter = () => telechargerTexte(`ensosp-suivi-${new Date().toISOString().slice(0, 10)}.csv`, suiviCsv(d.actions, utilisateur));
+  return <div className="corps-evaluations-superviseur"><div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter le suivi CSV</button></div><div className="liste-evaluations-superviseur">{d.evaluations.map((x) => <button className={selection === x.id ? "selectionnee" : ""} key={x.id} onClick={() => setSelection(x.id)}><strong>{x.recruteur}</strong><span>{x.statut} · {x.progression}%</span><small>{x.dateValidation !== "—" ? x.dateValidation : x.dateDebut}</small></button>)}</div>{e && <article className="detail-evaluation-superviseur"><h3>{e.recruteur}</h3><p>{e.perimetre} · {e.statut}</p>{e.reponses.map((r) => <div key={r.id}><span><code>{r.codeIndicateur}</code><strong>{r.indicateur}</strong></span><span className={`badge niveau-${r.niveau.toLowerCase()}`}>{r.niveau}</span></div>)}</article>}</div>;
 }
 
 function Validation({ actions, utilisateur, notifier, recharger }: { actions: readonly ActionMetier[]; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void; recharger: () => void }) {
