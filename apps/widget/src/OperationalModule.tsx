@@ -133,7 +133,7 @@ function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
   const agir = async (type: "DEMARRER" | "ENVOYER") => {
     setOperation(true);
     try {
-      if (type === "DEMARRER") await demarrerAction(a.id);
+      if (type === "DEMARRER") await demarrerAction(a, utilisateur);
       else await declarerProgression(a, commentaire, utilisateur, priseEnCompte);
       notifier("succes", type === "DEMARRER" ? "L’action est maintenant en cours." : "La prise en compte de la fiche et la demande de validation ont été transmises.");
       recharger();

@@ -155,7 +155,7 @@ describe("données recruteur et superviseur", () => {
 
     await declarerProgression(action,"",utilisateur,false);
 
-    expect(applyUserActions.mock.calls[0]![0]).toHaveLength(1);
+    expect(applyUserActions.mock.calls[0]![0]).toHaveLength(2);
     expect(applyUserActions.mock.calls[0]![0][0][3]).toMatchObject({
       Statut:"EN_ATTENTE_VALIDATION",
       PriseEnCompteFiche:false,
@@ -180,7 +180,7 @@ describe("données recruteur et superviseur", () => {
 
     expect(applyUserActions).toHaveBeenCalledOnce();
     const lot=applyUserActions.mock.calls[0]![0];
-    expect(lot).toHaveLength(2);
+    expect(lot).toHaveLength(3);
     expect(lot[0]).toMatchObject(["AddRecord","Validations",null,{Decision:decision,AncienNiveau:"ORANGE",Commentaire:commentaire}]);
     expect(lot[1]).toMatchObject(["UpdateRecord","ActionsProgres",30,{NiveauCourant:nouveau??"ORANGE",CommentaireSuperviseur:commentaire}]);
   });
@@ -197,7 +197,7 @@ describe("données recruteur et superviseur", () => {
 
     const [rattachement,audit]=applyUserActions.mock.calls[0]![0];
     expect(rattachement).toEqual(["UpdateRecord","ActionsProgres",30,{FicheVersion:40}]);
-    expect(audit[3]).toMatchObject({Acteur:2,TypeObjet:"ACTION_PROGRES",ObjetUid:"ACT-30",Action:"RATTACHEMENT_FICHE"});
+    expect(audit[3]).toMatchObject({Acteur:2,TypeObjet:"ACTION",ObjetUid:"ACT-30",Action:"RATTACHEMENT_FICHE"});
   });
 
   it("interdit de remplacer une version déjà rattachée",async()=>{

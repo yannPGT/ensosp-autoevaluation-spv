@@ -8,11 +8,12 @@ import {
   NouvelleAffectation,
   synchroniserSuperviseur,
 } from "./assignments-data.js";
+import { UtilisateurCourant } from "./portal-data.js";
 
 type EtatAffectations = { statut: "chargement" } | { statut: "erreur"; message: string } | { statut: "pret"; donnees: DonneesAffectations };
 type PanneauAffectation = { type: "CREATION"; valeur: NouvelleAffectation } | { type: "CLOTURE"; affectationId: number; dateFin: string };
 
-export function ModuleAffectations() {
+export function ModuleAffectations({ utilisateur }: { utilisateur: UtilisateurCourant }) {
   const [etat, setEtat] = useState<EtatAffectations>({ statut: "chargement" });
   const [tentative, setTentative] = useState(0);
   const [recherche, setRecherche] = useState("");
@@ -65,8 +66,8 @@ export function ModuleAffectations() {
     if (!panneau) return;
     setEnregistrement(true); setMessage(null);
     try {
-      if (panneau.type === "CREATION") await creerAffectation(panneau.valeur, donnees);
-      else await cloturerAffectation(panneau.affectationId, panneau.dateFin, donnees);
+      if (panneau.type === "CREATION") await creerAffectation(panneau.valeur, donnees, utilisateur.id);
+      else await cloturerAffectation(panneau.affectationId, panneau.dateFin, donnees, utilisateur.id);
       setMessage({ type: "succes", texte: panneau.type === "CREATION" ? "L’affectation a été créée et les ACL ont été synchronisées." : "L’affectation a été clôturée et les ACL ont été synchronisées." });
       setPanneau(null); setTentative((valeur) => valeur + 1);
     } catch (erreur) {
@@ -77,7 +78,7 @@ export function ModuleAffectations() {
   const synchroniser = async (superviseurId: number) => {
     setSynchronisation(superviseurId); setMessage(null);
     try {
-      await synchroniserSuperviseur(superviseurId, donnees);
+      await synchroniserSuperviseur(superviseurId, donnees, utilisateur.id);
       setMessage({ type: "succes", texte: "Les périmètres supervisés ont été réalignés sur l’historique des affectations." });
       setTentative((valeur) => valeur + 1);
     } catch (erreur) {

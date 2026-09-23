@@ -56,7 +56,7 @@ export async function chargerDonneesAffectations(): Promise<DonneesAffectations>
   return construireDonneesAffectations(utilisateurs, perimetres, entites, affectations);
 }
 
-export async function creerAffectation(saisie: NouvelleAffectation, donnees: DonneesAffectations): Promise<void> {
+export async function creerAffectation(saisie: NouvelleAffectation, donnees: DonneesAffectations, acteurId: number): Promise<void> {
   validerNouvelleAffectation(saisie, donnees);
   const docApi = obtenirDocApiGrist();
   if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
@@ -67,10 +67,11 @@ export async function creerAffectation(saisie: NouvelleAffectation, donnees: Don
       DateDebut: dateVersTimestamp(saisie.dateDebut), DateFin: null, Actif: true,
     }],
     ["UpdateRecord", "Utilisateurs", saisie.superviseurId, { PerimetresSupervises: ["L", ...ids] }],
+    ["AddRecord", "JournalAudit", null, { Uid: crypto.randomUUID(), Acteur: acteurId, Perimetre: saisie.perimetreId, TypeObjet: "AFFECTATION", ObjetUid: String(saisie.superviseurId), Action: "CREATION_AFFECTATION", Resume: `Affectation créée pour le périmètre ${saisie.perimetreId}` }],
   ]);
 }
 
-export async function cloturerAffectation(affectationId: number, dateFin: string, donnees: DonneesAffectations): Promise<void> {
+export async function cloturerAffectation(affectationId: number, dateFin: string, donnees: DonneesAffectations, acteurId: number): Promise<void> {
   const affectation = validerCloture(affectationId, dateFin, donnees);
   const docApi = obtenirDocApiGrist();
   if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
@@ -78,16 +79,17 @@ export async function cloturerAffectation(affectationId: number, dateFin: string
   await docApi.applyUserActions([
     ["UpdateRecord", "AffectationsSuperviseurs", affectation.id, { DateFin: dateVersTimestamp(dateFin), Actif: false }],
     ["UpdateRecord", "Utilisateurs", affectation.superviseurId, { PerimetresSupervises: ["L", ...idsRestants] }],
+    ["AddRecord", "JournalAudit", null, { Uid: crypto.randomUUID(), Acteur: acteurId, Perimetre: affectation.perimetreId, TypeObjet: "AFFECTATION", ObjetUid: String(affectation.id), Action: "CLOTURE_AFFECTATION", Resume: `Affectation du périmètre ${affectation.perimetre} clôturée` }],
   ]);
 }
 
-export async function synchroniserSuperviseur(superviseurId: number, donnees: DonneesAffectations): Promise<void> {
+export async function synchroniserSuperviseur(superviseurId: number, donnees: DonneesAffectations, acteurId: number): Promise<void> {
   const superviseur = donnees.superviseurs.find((element) => element.id === superviseurId);
   if (!superviseur) throw new Error("Le superviseur est introuvable.");
   const docApi = obtenirDocApiGrist();
   if (!docApi) throw new Error("La synchronisation est disponible uniquement depuis le widget Grist.");
   const ids = perimetresActifsDuSuperviseur(superviseurId, donnees);
-  await docApi.applyUserActions([["UpdateRecord", "Utilisateurs", superviseurId, { PerimetresSupervises: ["L", ...ids] }]]);
+  await docApi.applyUserActions([["UpdateRecord", "Utilisateurs", superviseurId, { PerimetresSupervises: ["L", ...ids] }], ["AddRecord", "JournalAudit", null, { Uid: crypto.randomUUID(), Acteur: acteurId, Perimetre: null, TypeObjet: "AFFECTATION", ObjetUid: String(superviseurId), Action: "SYNCHRONISATION_AFFECTATIONS", Resume: `Affectations synchronisées pour ${superviseur.nom}` }]]);
 }
 
 export function construireDonneesAffectations(
