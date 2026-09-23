@@ -72,6 +72,7 @@ export async function enregistrerUtilisateur(saisie: SaisieUtilisateur, acteur: 
       Uid: crypto.randomUUID(),
       ActeurEmail: acteur.email.trim().toLocaleLowerCase("fr"),
       Acteur: acteur.id,
+      Perimetre: saisie.perimetrePrincipalId || null,
       TypeObjet: "UTILISATEUR",
       ObjetUid: objetUid,
       Action: `${operation}_UTILISATEUR`,

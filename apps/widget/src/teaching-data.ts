@@ -1,5 +1,6 @@
 import { obtenirDocApiGrist, TableGrist } from "./grist-context.js";
 import { formaterNumeroVersion } from "./version-number.js";
+import { taillePdfMaxMo } from "./settings-data.js";
 
 export type StatutFiche = "BROUILLON" | "PUBLIEE" | "ARCHIVEE";
 export interface FichePedagogique { id:number; code:string; titre:string; description:string; perimetreId:number|null; perimetre:string; statut:StatutFiche; versionActiveId:number|null; versionActive:string; actif:boolean; versions:number; liaisons:number; }
@@ -36,7 +37,7 @@ export function construireDonneesPedagogiques(tf:TableGrist,tv:TableGrist,tl:Tab
 export async function enregistrerFiche(x:SaisieFiche,d:DonneesPedagogiques,utilisateurId:number):Promise<void>{
   validerFiche(x,d);const api=apiEcriture();const champs={Titre:x.titre.trim(),Description:x.description.trim(),Perimetre:x.perimetreId||null,Actif:x.actif};
   let ficheId=x.id??null;
-  if(ficheId)await api.applyUserActions([["UpdateRecord","FichesEnseignement",ficheId,champs]]);
+  if(ficheId)await api.applyUserActions([["UpdateRecord","FichesEnseignement",ficheId,champs],["AddRecord","JournalAudit",null,{Uid:crypto.randomUUID(),Acteur:utilisateurId,Perimetre:x.perimetreId||null,TypeObjet:"FICHE",ObjetUid:String(ficheId),Action:"MODIFICATION_FICHE",Resume:`Fiche ${x.code} modifiée`}]]);
   else{
     const codeFiche=code(x.code);await api.applyUserActions([["AddRecord","FichesEnseignement",null,{...champs,Code:codeFiche,Statut:"BROUILLON",CreatedBy:utilisateurId}]]);
     const table=await api.fetchTable("FichesEnseignement"),i=(table.Code??[]).findIndex(v=>v===codeFiche);ficheId=n(table.id?.[i])||null;
@@ -46,21 +47,26 @@ export async function enregistrerFiche(x:SaisieFiche,d:DonneesPedagogiques,utili
   const liaisonChamps={Indicateur:x.indicateurId,DeclencheRouge:x.niveau==="ROUGE",DeclencheOrange:x.niveau==="ORANGE",Actif:true};
   const actions:unknown[][]=liaison?[["UpdateRecord","FicheIndicateurs",liaison.id,liaisonChamps]]:[["AddRecord","FicheIndicateurs",null,{...liaisonChamps,Fiche:ficheId}]];
   for(const autre of liaisons)if(autre.id!==liaison?.id)actions.push(["UpdateRecord","FicheIndicateurs",autre.id,{Actif:false}]);
-  await api.applyUserActions(actions);
+  actions.push(["AddRecord","JournalAudit",null,{Uid:crypto.randomUUID(),Acteur:utilisateurId,Perimetre:x.perimetreId||null,TypeObjet:"FICHE",ObjetUid:String(ficheId),Action: x.id ? "MODIFICATION_LIAISON_FICHE" : "CREATION_FICHE",Resume:`Fiche ${x.code} et rattachement pédagogique enregistrés`}]);await api.applyUserActions(actions);
 }
-export async function enregistrerLiaison(x:SaisieLiaison,d:DonneesPedagogiques):Promise<void>{validerLiaison(x,d);const api=apiEcriture();const champs={DeclencheRouge:x.rouge,DeclencheOrange:x.orange,Actif:x.actif};await api.applyUserActions([x.id?["UpdateRecord","FicheIndicateurs",x.id,champs]:["AddRecord","FicheIndicateurs",null,{...champs,Fiche:x.ficheId,Indicateur:x.indicateurId}]]);}
-export async function ajouterVersion(x:SaisieVersion,d:DonneesPedagogiques,utilisateurId:number,maxMo=10):Promise<void>{
+export async function enregistrerLiaison(x:SaisieLiaison,d:DonneesPedagogiques,utilisateurId:number):Promise<void>{
+  validerLiaison(x,d); const api=apiEcriture();
+  const champs={DeclencheRouge:x.rouge,DeclencheOrange:x.orange,Actif:x.actif};
+  const mutation:unknown[]=x.id?["UpdateRecord","FicheIndicateurs",x.id,champs]:["AddRecord","FicheIndicateurs",null,{...champs,Fiche:x.ficheId,Indicateur:x.indicateurId}];
+  await api.applyUserActions([mutation,["AddRecord","JournalAudit",null,{Uid:crypto.randomUUID(),Acteur:utilisateurId,Perimetre:null,TypeObjet:"FICHE",ObjetUid:String(x.ficheId),Action:x.id?"MODIFICATION_LIAISON_FICHE":"CREATION_LIAISON_FICHE",Resume:`Rattachement pédagogique de la fiche ${x.ficheId} modifié`}]])
+}
+export async function ajouterVersion(x:SaisieVersion,d:DonneesPedagogiques,utilisateurId:number,maxMo=taillePdfMaxMo()):Promise<void>{
   validerVersion(x,d,maxMo);const fichier=x.fichier as File;const api=apiEcriture();if(!api.getAccessToken)throw new Error("Cette version de l’API Grist ne permet pas le dépôt de pièces jointes.");
   const jeton=await api.getAccessToken({readOnly:false});const formulaire=new FormData();formulaire.append("upload",fichier,fichier.name);
   const reponse=await fetch(`${jeton.baseUrl}/attachments?auth=${encodeURIComponent(jeton.token)}`,{method:"POST",headers:{"X-Requested-With":"XMLHttpRequest"},body:formulaire});if(!reponse.ok)throw new Error(`Le PDF n’a pas pu être déposé dans Grist (${reponse.status}).`);
   const ids=await reponse.json() as unknown;if(!Array.isArray(ids)||typeof ids[0]!=="number")throw new Error("Grist n’a retourné aucun identifiant de pièce jointe.");
-  const fiche=d.fiches.find(f=>f.id===x.ficheId);const empreinte=await sha256(fichier);await api.applyUserActions([["AddRecord","FicheVersions",null,{Uid:crypto.randomUUID(),Fiche:x.ficheId,NumeroVersion:x.numero.trim(),FichierPDF:["L",ids[0]],NomFichier:fichier.name,TailleOctets:fichier.size,EmpreinteSHA256:empreinte,Auteur:utilisateurId,Perimetre:fiche?.perimetreId||null,EstPubliee:false,DateFinValidite:x.dateFin?dateTimestamp(x.dateFin):null}]]);
+  const fiche=d.fiches.find(f=>f.id===x.ficheId);const empreinte=await sha256(fichier);await api.applyUserActions([["AddRecord","FicheVersions",null,{Uid:crypto.randomUUID(),Fiche:x.ficheId,NumeroVersion:x.numero.trim(),FichierPDF:["L",ids[0]],NomFichier:fichier.name,TailleOctets:fichier.size,EmpreinteSHA256:empreinte,Auteur:utilisateurId,Perimetre:fiche?.perimetreId||null,EstPubliee:false,DateFinValidite:x.dateFin?dateTimestamp(x.dateFin):null}],["AddRecord","JournalAudit",null,{Uid:crypto.randomUUID(),Acteur:utilisateurId,Perimetre:fiche?.perimetreId||null,TypeObjet:"FICHE",ObjetUid:String(x.ficheId),Action:"AJOUT_VERSION_FICHE",Resume:`Version ${x.numero.trim()} déposée pour ${fiche?.code||x.ficheId}`}]]);
 }
-export async function publierVersion(ficheId:number,versionId:number,d:DonneesPedagogiques):Promise<void>{
+export async function publierVersion(ficheId:number,versionId:number,d:DonneesPedagogiques,utilisateurId:number):Promise<void>{
   const fiche=d.fiches.find(f=>f.id===ficheId),version=d.versions.find(v=>v.id===versionId&&v.ficheId===ficheId);if(!fiche||!version)throw new Error("La fiche ou la version est introuvable.");if(fiche.statut==="ARCHIVEE")throw new Error("Une fiche archivée ne peut plus être publiée.");if(version.estPubliee&&fiche.versionActiveId===version.id)return;if(!version.attachmentId)throw new Error("La version ne contient aucun PDF.");const liaisons=d.liaisons.filter(l=>l.ficheId===ficheId&&l.actif),liaison=liaisons[0];if(liaisons.length!==1||!liaison||liaison.rouge===liaison.orange)throw new Error("La fiche doit être reliée à un seul indicateur et à un seul niveau, rouge ou orange.");
-  await apiEcriture().applyUserActions([["UpdateRecord","FicheVersions",version.id,{EstPubliee:true,DatePublication:maintenant()}],["UpdateRecord","FichesEnseignement",fiche.id,{VersionActive:version.id,Statut:"PUBLIEE",Actif:true}]]);
+  await apiEcriture().applyUserActions([["UpdateRecord","FicheVersions",version.id,{EstPubliee:true,DatePublication:maintenant()}],["UpdateRecord","FichesEnseignement",fiche.id,{VersionActive:version.id,Statut:"PUBLIEE",Actif:true}],["AddRecord","JournalAudit",null,{Uid:crypto.randomUUID(),Acteur:utilisateurId,Perimetre:fiche.perimetreId||null,TypeObjet:"FICHE",ObjetUid:String(fiche.id),Action:"PUBLICATION_VERSION_FICHE",Resume:`Version ${version.numero} publiée pour ${fiche.code}`}]]);
 }
-export async function archiverFiche(ficheId:number,d:DonneesPedagogiques):Promise<void>{const fiche=d.fiches.find(f=>f.id===ficheId);if(!fiche||fiche.statut!=="PUBLIEE")throw new Error("Seule une fiche publiée peut être archivée.");await apiEcriture().applyUserActions([["UpdateRecord","FichesEnseignement",fiche.id,{Statut:"ARCHIVEE",Actif:false}]]);}
+export async function archiverFiche(ficheId:number,d:DonneesPedagogiques,utilisateurId:number):Promise<void>{const fiche=d.fiches.find(f=>f.id===ficheId);if(!fiche||fiche.statut!=="PUBLIEE")throw new Error("Seule une fiche publiée peut être archivée.");await apiEcriture().applyUserActions([["UpdateRecord","FichesEnseignement",fiche.id,{Statut:"ARCHIVEE",Actif:false}],["AddRecord","JournalAudit",null,{Uid:crypto.randomUUID(),Acteur:utilisateurId,Perimetre:fiche.perimetreId||null,TypeObjet:"FICHE",ObjetUid:String(fiche.id),Action:"ARCHIVAGE_FICHE",Resume:`Fiche ${fiche.code} archivée`}]]);}
 export async function urlVersion(version:VersionPedagogique):Promise<string>{if(!version.attachmentId)throw new Error("Aucun PDF n’est associé à cette version.");const api=apiEcriture();if(!api.getAccessToken)throw new Error("Le téléchargement n’est pas disponible avec cette version de Grist.");const jeton=await api.getAccessToken({readOnly:true});return`${jeton.baseUrl}/attachments/${version.attachmentId}/download?auth=${encodeURIComponent(jeton.token)}`;}
 
 export function validerFiche(x:SaisieFiche,d:DonneesPedagogiques):void{const c=code(x.code);if(!/^FICHE_[A-Z0-9_]{2,40}$/.test(c)||!x.titre.trim())throw new Error("Le code FICHE_... et le titre sont obligatoires.");if(d.fiches.some(f=>f.id!==x.id&&f.code.toUpperCase()===c))throw new Error("Ce code de fiche existe déjà.");if(x.perimetreId&&!d.perimetres.find(p=>p.id===x.perimetreId)?.actif)throw new Error("Sélectionnez un périmètre actif.");if(!d.indicateurs.find(i=>i.id===x.indicateurId&&i.actif))throw new Error("Sélectionnez un indicateur actif.");if(x.niveau!=="ROUGE"&&x.niveau!=="ORANGE")throw new Error("Sélectionnez le niveau rouge ou orange.");}

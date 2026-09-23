@@ -117,7 +117,7 @@ export function App() {
           )}
           {pageActive === "utilisateurs" && <ModuleUtilisateurs utilisateurCourant={utilisateur} />}
           {pageActive === "territoires" && <ModuleTerritoires />}
-          {pageActive === "affectations" && <ModuleAffectations />}
+          {pageActive === "affectations" && <ModuleAffectations utilisateur={utilisateur} />}
           {pageActive === "referentiel" && <ModuleReferentiel />}
           {pageActive === "pedagogie" && utilisateur.role === "ADMIN" && <ModulePedagogique utilisateur={utilisateur} />}
           {pageActive === "parametres" && <ModuleParametres utilisateur={utilisateur} />}
