@@ -1,5 +1,6 @@
 import { obtenirDocApiGrist, TableGrist } from "./grist-context.js";
 import { Niveau } from "./evaluation-data.js";
+import { construireQuestionnaire, indicateursQuestionnaire, questionnaireDepuisSnapshot, questionnaireHistorique, serialiserQuestionnaire, QuestionnaireDefinition } from "./questionnaire-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
 
 export type StatutSessionEvaluation = "BROUILLON" | "VALIDEE" | null;
@@ -9,10 +10,12 @@ export interface SessionEvaluation {
   reponses: Record<string, Niveau>;
   statut: StatutSessionEvaluation;
   verrouillee: boolean;
+  questionnaire: QuestionnaireDefinition;
 }
 
 export interface ResultatValidation {
   avertissement: string | null;
+  generation: "COMPLETE" | "INCOMPLETE";
 }
 
 export function ficheDeclenchee(
@@ -27,13 +30,15 @@ export function ficheDeclenchee(
 
 export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant): Promise<SessionEvaluation> {
   const api = obtenirDocApiGrist();
-  if (!api) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false };
+  if (!api) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false, questionnaire: questionnaireHistorique() };
 
-  const [evaluations, reponses, indicateurs, utilisateurs] = await Promise.all([
+  const [evaluations, reponses, indicateurs, utilisateurs, axes, criteres] = await Promise.all([
     api.fetchTable("Evaluations"),
     api.fetchTable("Reponses"),
     api.fetchTable("Indicateurs"),
     api.fetchTable("Utilisateurs"),
+    api.fetchTable("Axes"),
+    api.fetchTable("Criteres"),
   ]);
 
   const candidats = (evaluations.id ?? [])
@@ -43,6 +48,7 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
       recruteur: referenceId(evaluations.Recruteur?.[i]),
       statut: texte(evaluations.Statut?.[i]),
       dateValidation: nombre(evaluations.DateValidation?.[i]) ?? nombre(evaluations.UpdatedAt?.[i]) ?? 0,
+      snapshot: texte(evaluations.ReferentielSnapshot?.[i]),
     }))
     .filter((e) => e.id && e.recruteur === utilisateur.id);
 
@@ -58,11 +64,11 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
   const nouvelleEvaluationAutorisee = Boolean(validee && dateDeblocage > validee.dateValidation);
 
   if (!brouillon && nouvelleEvaluationAutorisee) {
-    return { evaluationId: null, reponses: {}, statut: null, verrouillee: false };
+    return { evaluationId: null, reponses: {}, statut: null, verrouillee: false, questionnaire: chargerQuestionnaireDepuisTables(axes, indicateurs, criteres) };
   }
 
   const cible = brouillon ?? validee;
-  if (!cible?.id) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false };
+  if (!cible?.id) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false, questionnaire: chargerQuestionnaireDepuisTables(axes, indicateurs, criteres) };
 
   const evaluationId = cible.id;
   const codes = new Map<number, string>();
@@ -85,15 +91,19 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
     reponses: resultat,
     statut,
     verrouillee: statut === "VALIDEE",
+    questionnaire: questionnaireDepuisSnapshot(cible.snapshot) ?? chargerQuestionnaireDepuisTables(axes, indicateurs, criteres),
   };
 }
 
 export async function creerEvaluation(utilisateur: UtilisateurCourant): Promise<number> {
   const api = exigerApi();
-  const [utilisateurs, campagnes, evaluationsExistantes] = await Promise.all([
+  const [utilisateurs, campagnes, evaluationsExistantes, axes, indicateurs, criteres] = await Promise.all([
     api.fetchTable("Utilisateurs"),
     api.fetchTable("Campagnes"),
     api.fetchTable("Evaluations"),
+    api.fetchTable("Axes"),
+    api.fetchTable("Indicateurs"),
+    api.fetchTable("Criteres"),
   ]);
 
   const ui = (utilisateurs.id ?? []).findIndex((v) => nombre(v) === utilisateur.id);
@@ -136,12 +146,15 @@ export async function creerEvaluation(utilisateur: UtilisateurCourant): Promise<
   }
 
   const uid = crypto.randomUUID();
+  const questionnaire = chargerQuestionnaireDepuisTables(axes, indicateurs, criteres);
   await api.applyUserActions([["AddRecord", "Evaluations", null, {
     Uid: uid,
     Recruteur: utilisateur.id,
     Perimetre: perimetre,
     Campagne: campagne,
     Statut: "BROUILLON",
+    ReferentielVersion: questionnaire.version,
+    ReferentielSnapshot: serialiserQuestionnaire(questionnaire),
   }]]);
 
   const evaluations = await api.fetchTable("Evaluations");
@@ -191,24 +204,35 @@ export async function enregistrerReponse(evaluationId: number, code: string, niv
 
 export async function validerEvaluation(evaluationId: number, utilisateur: UtilisateurCourant): Promise<ResultatValidation> {
   const api = exigerApi();
-  const [evaluations, reponses, indicateurs] = await Promise.all([
+  const [evaluations, reponses, indicateurs, axes, criteres] = await Promise.all([
     api.fetchTable("Evaluations"),
     api.fetchTable("Reponses"),
     api.fetchTable("Indicateurs"),
+    api.fetchTable("Axes"),
+    api.fetchTable("Criteres"),
   ]);
   const ei = (evaluations.id ?? []).findIndex((v) => nombre(v) === evaluationId);
   if (ei < 0) throw new Error("Cette évaluation est introuvable.");
   const statut = texte(evaluations.Statut?.[ei]);
-  if (statut === "VALIDEE") return { avertissement: null };
-  if (statut !== "BROUILLON") throw new Error("Cette évaluation n’est plus modifiable.");
+  const evaluationDejaValidee = statut === "VALIDEE";
+  if (statut !== "BROUILLON" && !evaluationDejaValidee) throw new Error("Cette évaluation n’est plus modifiable.");
   const recruteur = referenceId(evaluations.Recruteur?.[ei]);
   const perimetre = referenceId(evaluations.Perimetre?.[ei]);
   if (!recruteur || !perimetre) throw new Error("Le contexte recruteur ou périmètre de cette évaluation est incomplet.");
 
+  const questionnaireFige = questionnaireDepuisSnapshot(evaluations.ReferentielSnapshot?.[ei]);
+  const questionnaire = questionnaireFige ?? chargerQuestionnaireDepuisTables(axes, indicateurs, criteres);
+  const indicateursQuestionnaireActifs = indicateursQuestionnaire(questionnaire);
+  const codesAutorises = new Set(indicateursQuestionnaireActifs.map((indicateur) => indicateur.code));
+  const codesObligatoires = new Set(indicateursQuestionnaireActifs.filter((indicateur) => indicateur.obligatoire !== false).map((indicateur) => indicateur.code));
   const obligatoires = new Set<number>();
+  const autorises = new Set<number>();
   (indicateurs.id ?? []).forEach((v, i) => {
     const id = nombre(v);
-    if (id && booleen(indicateurs.Obligatoire?.[i]) && booleen(indicateurs.Actif?.[i])) obligatoires.add(id);
+    const code = texte(indicateurs.Code?.[i]);
+    if (!id || (!questionnaireFige && !booleen(indicateurs.Actif?.[i])) || (code && !codesAutorises.has(code))) return;
+    autorises.add(id);
+    if (questionnaireFige ? (!code || codesObligatoires.has(code)) : booleen(indicateurs.Obligatoire?.[i])) obligatoires.add(id);
   });
   const lignes: (typeof ligneReponse)[] = [];
   let reponseInvalide = false;
@@ -217,7 +241,7 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
     const id = nombre(v);
     const indicateur = referenceId(reponses.Indicateur?.[i]);
     const niveau = normaliserNiveau(reponses.Niveau?.[i]);
-    if (!id || !indicateur || !niveau || !obligatoires.has(indicateur)) {
+    if (!id || !indicateur || !niveau || !autorises.has(indicateur)) {
       reponseInvalide = true;
       return;
     }
@@ -226,15 +250,17 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
   if (reponseInvalide) {
     throw new Error("Une ou plusieurs réponses sont invalides ou ne correspondent pas aux indicateurs attendus.");
   }
-  if (obligatoires.size && [...obligatoires].some((id) => !lignes.some((r) => r.indicateur === id))) {
+  if (!evaluationDejaValidee && obligatoires.size && [...obligatoires].some((id) => !lignes.some((r) => r.indicateur === id))) {
     throw new Error("Tous les indicateurs obligatoires doivent être renseignés.");
   }
 
-  const dateValidation = maintenant();
-  await api.applyUserActions([["UpdateRecord", "Evaluations", evaluationId, {
-    Statut: "VALIDEE",
-    DateValidation: dateValidation,
-  }]]);
+  if (!evaluationDejaValidee) {
+    const dateValidation = maintenant();
+    await api.applyUserActions([["UpdateRecord", "Evaluations", evaluationId, {
+      Statut: "VALIDEE",
+      DateValidation: dateValidation,
+    }]]);
+  }
 
   let avertissement: string | null = null;
   try {
@@ -307,7 +333,7 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
     avertissement = "L’évaluation est bien validée, mais le parcours de progression n’a pas pu être créé automatiquement. Contactez un administrateur.";
   }
 
-  try {
+  if (!evaluationDejaValidee) try {
     await api.applyUserActions([["AddRecord", "JournalAudit", null, {
       Uid: crypto.randomUUID(),
       Acteur: utilisateur.id,
@@ -318,7 +344,20 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
       Resume: "Auto-évaluation validée",
     }]]);
   } catch {}
-  return { avertissement };
+  return { avertissement, generation: avertissement ? "INCOMPLETE" : "COMPLETE" };
+}
+
+/** Rejoue uniquement la génération du parcours d’une évaluation déjà validée. */
+export async function reprendreGenerationEvaluation(evaluationId: number, utilisateur: UtilisateurCourant): Promise<ResultatValidation> {
+  if (utilisateur.role !== "ADMIN" && utilisateur.role !== "SUPERVISEUR") {
+    throw new Error("Seul un administrateur ou le superviseur habilité peut relancer la génération du parcours.");
+  }
+  return validerEvaluation(evaluationId, utilisateur);
+}
+
+function chargerQuestionnaireDepuisTables(axes: TableGrist, indicateurs: TableGrist, criteres: TableGrist): QuestionnaireDefinition {
+  if (!(axes.id?.length && indicateurs.id?.length && criteres.id?.length)) return questionnaireHistorique();
+  return construireQuestionnaire(axes, indicateurs, criteres);
 }
 
 const ligneReponse = { id: 0, indicateur: 0, niveau: "ROUGE" as Niveau };
