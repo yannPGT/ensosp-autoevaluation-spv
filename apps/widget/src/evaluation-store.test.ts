@@ -152,4 +152,33 @@ describe("validerEvaluation", () => {
 
     expect(applyUserActions).not.toHaveBeenCalled();
   });
+
+  it("reprend la génération d’une évaluation validée sans modifier le bilan ni doubler une action", async () => {
+    const idsIndicateurs = Array.from({ length: 3 }, (_, index) => index + 1);
+    const idsReponses = Array.from({ length: 3 }, (_, index) => index + 101);
+    const tablesReprise: Record<string, TableGrist> = {
+      Evaluations: { id: [10], Uid: ["evaluation-10"], Recruteur: [7], Perimetre: [3], Statut: ["VALIDEE"] },
+      Indicateurs: { id: idsIndicateurs, Code: ["IND_01", "IND_02", "IND_03"], Actif: [true, true, true], Obligatoire: [true, true, true] },
+      Reponses: { id: idsReponses, Evaluation: [10, 10, 10], Indicateur: idsIndicateurs, Niveau: ["ORANGE", "ORANGE", "VERT"] },
+      FeuillesRoute: { id: [40], Evaluation: [10] },
+      ActionsProgres: { id: [50], FeuilleRoute: [40], Reponse: [101] },
+      FicheIndicateurs: { id: [] }, FichesEnseignement: { id: [] },
+    };
+    const lots: unknown[][][] = [];
+    const applyUserActions = vi.fn(async (actions: unknown[][]) => { lots.push(actions); });
+    vi.stubGlobal("window", { parent: {}, grist: { docApi: {
+      applyUserActions,
+      fetchTable: vi.fn(async (tableId: string) => tablesReprise[tableId] ?? {}),
+    } } });
+
+    const resultat = await validerEvaluation(10, recruteur);
+
+    expect(resultat).toEqual({ avertissement: null, generation: "COMPLETE" });
+    expect(lots).toHaveLength(1);
+    expect(lots[0]).toHaveLength(1);
+    expect(lots[0]?.[0]?.[0]).toBe("AddRecord");
+    expect(lots[0]?.[0]?.[1]).toBe("ActionsProgres");
+    expect(lots[0]?.[0]?.[3]).toMatchObject({ Evaluation: 10, FeuilleRoute: 40, Reponse: 102 });
+    expect(lots[0]?.some((action) => action[1] === "Evaluations")).toBe(false);
+  });
 });
