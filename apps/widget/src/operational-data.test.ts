@@ -378,4 +378,12 @@ describe("règles métier du mode démonstration", () => {
     const actions=donnees.actions;
     expect(new Set(actions.map(a=>a.id)).size).toBe(actions.length);
   });
+  it("ne conserve aucun doublon d'identifiant de réponse entre historique et cycle courant", async () => {
+    installerModeDemo();
+    sessionStorage.setItem("spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"ORANGE"},statut:"VALIDEE",archiveeLe:1_730_000_000}]));
+    sessionStorage.setItem("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9002,reponses:{IND_01:"ORANGE",IND_03:"ROUGE"},statut:"VALIDEE",verrouillee:true}));
+    const donnees=await chargerDonneesOperationnelles("historique",utilisateur);
+    expect(donnees.evaluations.filter(e=>[9001,9002].includes(e.id))).toHaveLength(2);
+    expect(donnees.actions.every(a=>a.recruteurId===utilisateur.id)).toBe(true);
+  });
 });
