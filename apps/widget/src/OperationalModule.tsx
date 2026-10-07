@@ -1,6 +1,7 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import { Niveau } from "./evaluation-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
+import { estModeDemonstration } from "./grist-context.js";
 import {
   ActionMetier,
   chargerDonneesOperationnelles,
@@ -39,6 +40,7 @@ const titres: Record<string, [string, string]> = {
 export function ModuleOperationnel({ page, utilisateur }: { page: string; utilisateur: UtilisateurCourant }) {
   const [etat, setEtat] = useState<Etat>({ statut: "chargement" });
   const [tentative, setTentative] = useState(0);
+  const modeDemo = estModeDemonstration();
   const [message, setMessage] = useState<{ type: "succes" | "erreur"; texte: string } | null>(null);
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export function ModuleOperationnel({ page, utilisateur }: { page: string; utilis
         </div>
       </div>
       {message && <p className={`message-formulaire message-${message.type}`} role="status">{message.texte}</p>}
-      <Vue page={page} d={etat.donnees} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />
+      <Vue page={page} d={etat.donnees} utilisateur={utilisateur} notifier={notifier} recharger={recharger} modeDemo={modeDemo} />
     </section>
   );
 }
@@ -81,10 +83,11 @@ function Vue({ page, d, utilisateur, notifier, recharger }: {
   utilisateur: UtilisateurCourant;
   notifier: (t: "succes" | "erreur", x: string) => void;
   recharger: () => void;
+  modeDemo: boolean;
 }) {
   if (page === "resultats") return <Resultats d={d} utilisateur={utilisateur} />;
-  if (page === "progression") return <Progression actions={d.actions} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
-  if (page === "fiches") return <Fiches d={d} utilisateur={utilisateur} notifier={notifier} />;
+  if (page === "progression") return <Progression actions={d.actions} utilisateur={utilisateur} notifier={notifier} recharger={recharger} modeDemo={modeDemo} />;
+  if (page === "fiches") return <Fiches d={d} utilisateur={utilisateur} notifier={notifier} modeDemo={modeDemo} />;
   if (page === "historique") return <Historique d={d} />;
   if (page === "recruteurs" || page === "gestion-recruteurs") return <Recruteurs d={d} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />;
   if (page === "evaluations-recruteurs") return <Evaluations d={d} utilisateur={utilisateur} />;
@@ -115,10 +118,11 @@ function Progression({ actions, utilisateur, notifier, recharger }: {
   utilisateur: UtilisateurCourant;
   notifier: (t: "succes" | "erreur", x: string) => void;
   recharger: () => void;
+  modeDemo: boolean;
 }) {
   if (!actions.length) return <Vide texte="Aucune action de progression n’est ouverte pour le moment." />;
   const exporter = () => imprimerPdf("Feuille de route", feuilleRouteHtml(actions, utilisateur));
-  return <><div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter la feuille de route en PDF</button></div><div className="liste-actions-progres">{actions.map((a) => <ActionRecruteur key={a.id} action={a} utilisateur={utilisateur} notifier={notifier} recharger={recharger} />)}</div></>;
+  return <><div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter la feuille de route en PDF</button></div><div className="liste-actions-progres">{actions.map((a) => <ActionRecruteur key={a.id} action={a} utilisateur={utilisateur} notifier={notifier} recharger={recharger} modeDemo={modeDemo} />)}</div></>;
 }
 
 function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
@@ -126,6 +130,7 @@ function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
   utilisateur: UtilisateurCourant;
   notifier: (t: "succes" | "erreur", x: string) => void;
   recharger: () => void;
+  modeDemo: boolean;
 }) {
   const [commentaire, setCommentaire] = useState(a.commentaireRecruteur);
   const [priseEnCompte, setPriseEnCompte] = useState(a.priseEnCompteFiche);
@@ -156,10 +161,10 @@ function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
     <article className="carte-action-progres">
       <EnteteAction action={a} />
       <p><strong>Échéance :</strong> {a.echeance}</p>
-      {a.ficheVersionId && <div className="ressource-associee"><p>Fiche proposée : <strong>{a.fiche}</strong> · version {a.version}</p><div className="actions-formulaire"><button type="button" className="bouton-secondaire" disabled={operation} onClick={() => ouvrir("OUVERTURE")}>Consulter</button><button type="button" className="bouton-secondaire" disabled={operation} onClick={() => ouvrir("TELECHARGEMENT")}>Télécharger</button></div></div>}
+      {a.ficheVersionId && <div className="ressource-associee"><p>{modeDemo ? "Document de présentation proposé" : "Fiche proposée"} : <strong>{a.fiche}</strong> · version {a.version}</p><div className="actions-formulaire"><button type="button" className="bouton-secondaire" disabled={operation} onClick={() => ouvrir("OUVERTURE")}>Consulter</button><button type="button" className="bouton-secondaire" disabled={operation} onClick={() => ouvrir("TELECHARGEMENT")}>Télécharger</button></div></div>}
       {!a.ficheVersionId && <p className="message-formulaire message-avertissement">Aucune fiche publiée n’est disponible pour cet indicateur. Vous pouvez néanmoins déclarer votre progression.</p>}
       <label>Progrès réalisés (facultatif)<textarea rows={3} value={commentaire} onChange={(e) => setCommentaire(e.target.value)} disabled={!modifiable} /></label>
-      {modifiable && a.ficheVersionId && <label className="confirmation-fiche"><input type="checkbox" checked={priseEnCompte} onChange={(e) => setPriseEnCompte(e.target.checked)} /> Prise en compte de la fiche d’enseignement réalisée</label>}
+      {modifiable && a.ficheVersionId && <label className="confirmation-fiche"><input type="checkbox" checked={priseEnCompte} onChange={(e) => setPriseEnCompte(e.target.checked)} /> {modeDemo ? "Consultation du document de présentation réalisée" : "Prise en compte de la fiche d’enseignement réalisée"}</label>}
       <div className="actions-formulaire">
         {a.statut === "A_PRENDRE_EN_COMPTE" && <button type="button" className="bouton-secondaire" disabled={operation} onClick={() => agir("DEMARRER")}>Commencer l’action</button>}
         {modifiable && <button type="button" disabled={operation || Boolean(a.ficheVersionId && !priseEnCompte)} onClick={() => agir("ENVOYER")}>Demander le passage au vert</button>}
@@ -170,10 +175,10 @@ function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
   );
 }
 
-function Fiches({ d, utilisateur, notifier }: { d: DonneesOperationnelles; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void }) {
+function Fiches({ d, utilisateur, notifier, modeDemo }: { d: DonneesOperationnelles; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void; modeDemo: boolean }) {
   const autorise = d.evaluations.some((e) => e.recruteurId === utilisateur.id && e.statut === "VALIDEE" && e.progression === 100);
-  if (!autorise) return <Vide texte="Les fiches d’enseignement seront accessibles après votre première évaluation complète et validée." />;
-  if (!d.fiches.length) return <Vide texte="Aucune fiche d’enseignement publiée n’est disponible." />;
+  if (!autorise) return <Vide texte={modeDemo ? "Les documents de présentation seront accessibles après votre première évaluation complète et validée." : "Les fiches d’enseignement seront accessibles après votre première évaluation complète et validée."} />;
+  if (!d.fiches.length) return <Vide texte={modeDemo ? "Aucun document de présentation n’est disponible." : "Aucune fiche d’enseignement publiée n’est disponible."} />;
   const ouvrir = async (fiche: FicheDisponible, type: "OUVERTURE" | "TELECHARGEMENT") => {
     try {
       await ouvrirFiche(fiche.versionId, fiche.attachmentId, null, utilisateur, type, fiche.nomFichier);
