@@ -19,4 +19,4 @@ jobs:
           node-version: 22
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @ensosp/widget build
-      - run: pnpm --filter @ensosp/widget test
+      - run: pnpm test -- apps/widget/src
