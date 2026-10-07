@@ -291,9 +291,10 @@ describe("règles métier du mode démonstration", () => {
   });
 
   it("conserve le cycle 9001 archivé lorsque le cycle 9002 est validé", async () => {
-    const stockage=installerDemo("RECRUTEUR");
-    stockage.set("spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"VERT"},statut:"VALIDEE",archiveeLe:1750000000}]));
-    stockage.set("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9002,reponses:{IND_01:"VERT",IND_02:"ORANGE"},statut:"VALIDEE",verrouillee:true}));
+    installerModeDemo();
+    const stockage=sessionStorage as unknown as {getItem:(k:string)=>string|null,setItem:(k:string,v:string)=>void};
+    stockage.setItem("spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"VERT"},statut:"VALIDEE",archiveeLe:1750000000}]));
+    stockage.setItem("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9002,reponses:{IND_01:"VERT",IND_02:"ORANGE"},statut:"VALIDEE",verrouillee:true}));
 
     const donnees=await chargerDonneesOperationnelles("historique",utilisateur);
 
