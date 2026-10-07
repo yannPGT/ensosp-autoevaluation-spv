@@ -57,7 +57,7 @@ export async function chargerDonneesTerritoires(): Promise<DonneesTerritoires> {
 export async function enregistrerEntite(saisie: SaisieEntite, donnees: DonneesTerritoires): Promise<void> {
   validerEntite(saisie, donnees);
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { enregistrerEntiteDemo(saisie); return; }
   const champs = { Code: normaliserCode(saisie.code), Nom: saisie.nom.trim(), Parent: saisie.parentId || null, Actif: saisie.actif };
   await docApi.applyUserActions([saisie.id
     ? ["UpdateRecord", "Entites", saisie.id, champs]
@@ -67,7 +67,7 @@ export async function enregistrerEntite(saisie: SaisieEntite, donnees: DonneesTe
 export async function enregistrerPerimetre(saisie: SaisiePerimetre, donnees: DonneesTerritoires): Promise<void> {
   validerPerimetre(saisie, donnees);
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { enregistrerPerimetreDemo(saisie); return; }
   const champs = { Code: normaliserCode(saisie.code), Nom: saisie.nom.trim(), Entite: saisie.entiteId, Actif: saisie.actif };
   await docApi.applyUserActions([saisie.id
     ? ["UpdateRecord", "Perimetres", saisie.id, champs]
@@ -168,11 +168,18 @@ function compterReferencesActives(table: TableGrist, colonne: string, id: number
   return total;
 }
 
+const CLE_DEMO_TERRITOIRES="spv-demo-admin-territoires-v1";
+type EtatTerritoiresDemo={entites:SaisieEntite[];perimetres:SaisiePerimetre[]};
+function lireTerritoiresDemo():EtatTerritoiresDemo{try{const b=sessionStorage.getItem(CLE_DEMO_TERRITOIRES);if(b)return JSON.parse(b) as EtatTerritoiresDemo;}catch{}return{entites:[],perimetres:[]};}
+function ecrireTerritoiresDemo(e:EtatTerritoiresDemo){try{sessionStorage.setItem(CLE_DEMO_TERRITOIRES,JSON.stringify(e));}catch{}}
+function enregistrerEntiteDemo(s:SaisieEntite){const e=lireTerritoiresDemo(),id=s.id??(100+e.entites.length);e.entites=e.entites.filter(x=>x.id!==id).concat({...s,id});ecrireTerritoiresDemo(e);}
+function enregistrerPerimetreDemo(s:SaisiePerimetre){const e=lireTerritoiresDemo(),id=s.id??(200+e.perimetres.length);e.perimetres=e.perimetres.filter(x=>x.id!==id).concat({...s,id});ecrireTerritoiresDemo(e);}
 function donneesDemonstration(): DonneesTerritoires {
+  const d=lireTerritoiresDemo();
   return construireDonneesTerritoires({
-    id: [1, 2], Code: ["ENSOSPP", "SIS_33"], Nom: ["ENSOSPP", "SDIS de la Gironde"], Parent: [null, 1], Actif: [true, true],
+    id: [1, 2,...d.entites.map(x=>x.id!)], Code: ["ENSOSPP", "SIS_33",...d.entites.map(x=>normaliserCode(x.code))], Nom: ["ENSOSPP", "SDIS de la Gironde",...d.entites.map(x=>x.nom)], Parent: [null, 1,...d.entites.map(x=>x.parentId||null)], Actif: [true, true,...d.entites.map(x=>x.actif)],
   }, {
-    id: [11, 12], Code: ["PER_33_GLOBAL", "PER_33_NORD"], Nom: ["SDIS 33 global", "Groupement Nord"], Entite: [2, 2], Actif: [true, true],
+    id: [11, 12,...d.perimetres.map(x=>x.id!)], Code: ["PER_33_GLOBAL", "PER_33_NORD",...d.perimetres.map(x=>normaliserCode(x.code))], Nom: ["SDIS 33 global", "Groupement Nord",...d.perimetres.map(x=>x.nom)], Entite: [2, 2,...d.perimetres.map(x=>x.entiteId)], Actif: [true, true,...d.perimetres.map(x=>x.actif)],
   }, {
     id: [7], Entite: [2], PerimetrePrincipal: [12], Actif: [true],
   }, {
