@@ -188,8 +188,7 @@ function perimetresActifsDuSuperviseur(superviseurId: number, donnees: DonneesAf
 const CLE_DEMO_AFFECTATIONS="spv-demo-admin-affectations-v1";
 type AffectationDemo={id:number;superviseurId:number;perimetreId:number;dateDebut:number;dateFin:number|null;actif:boolean};
 function affectationsDemoInitiales():AffectationDemo[]{return [
-  {id:20,superviseurId:2,perimetreId:11,dateDebut:1_700_006_400,dateFin:null,actif:true},
-  {id:21,superviseurId:3,perimetreId:11,dateDebut:1_650_067_200,dateFin:1_680_048_000,actif:false},
+  {id:20,superviseurId:2,perimetreId:2,dateDebut:1_700_006_400,dateFin:null,actif:true},
 ];}
 function lireAffectationsDemo():AffectationDemo[]{try{const b=sessionStorage.getItem(CLE_DEMO_AFFECTATIONS);if(b)return JSON.parse(b) as AffectationDemo[];}catch{}return affectationsDemoInitiales();}
 function ecrireAffectationsDemo(v:AffectationDemo[]){try{sessionStorage.setItem(CLE_DEMO_AFFECTATIONS,JSON.stringify(v));}catch{}}
@@ -200,11 +199,11 @@ function donneesDemonstration(): DonneesAffectations {
   const affectations=lireAffectationsDemo();
   const perimetresParSuperviseur=(id:number)=>["L",...idsUniques(affectations.filter(a=>a.superviseurId===id&&a.actif).map(a=>a.perimetreId))];
   return construireDonneesAffectations({
-    id: [2, 3], Prenom: ["Camille", "Nora"], Nom: ["BERNARD", "DUPONT"], Email: ["camille.bernard@example.invalid", "nora.dupont@example.invalid"],
-    Role: ["SUPERVISEUR", "SUPERVISEUR"], Actif: [true, true], PerimetresSupervises: [perimetresParSuperviseur(2), perimetresParSuperviseur(3)],
+    id: [2], Prenom: ["Camille"], Nom: ["BERNARD"], Email: ["camille.bernard@example.invalid"],
+    Role: ["SUPERVISEUR"], Actif: [true], PerimetresSupervises: [perimetresParSuperviseur(2)],
   }, {
-    id: [11, 12], Code: ["PER_33_NORD", "PER_33_SUD"], Nom: ["Groupement Nord", "Groupement Sud"], Entite: [1, 1], Actif: [true, true],
-  }, { id: [1], Code: ["SIS_33"], Nom: ["SDIS de la Gironde"] }, {
+    id: [1, 2], Code: ["PER_NATIONAL", "PER_33_NORD"], Nom: ["Périmètre national", "SDIS 33 groupement NORD"], Entite: [1, 2], Actif: [true, true],
+  }, { id: [1,2], Code: ["ENSOSPP","SIS_33"], Nom: ["ENSOSPP","SDIS de la Gironde"] }, {
     id: affectations.map(a=>a.id), Superviseur: affectations.map(a=>a.superviseurId), Perimetre: affectations.map(a=>a.perimetreId),
     DateDebut: affectations.map(a=>a.dateDebut), DateFin: affectations.map(a=>a.dateFin), Actif: affectations.map(a=>a.actif),
   });
