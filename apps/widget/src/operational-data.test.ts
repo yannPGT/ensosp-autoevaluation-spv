@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chargerDonneesOperationnelles, construireDonneesOperationnelles, debloquerEvaluationRecruteur, deciderAction, declarerProgression, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante, rouvrirAction } from "./operational-data.js";
+import { chargerDonneesOperationnelles, construireDonneesOperationnelles, debloquerEvaluationRecruteur, deciderAction, declarerProgression, definirEcheance, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante, rouvrirAction } from "./operational-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
 
 const utilisateur:UtilisateurCourant={id:3,prenom:"Morgan",nom:"ROBERT",email:"m@x",role:"RECRUTEUR",entite:"SDIS",perimetrePrincipal:"Nord",perimetresSupervises:[],superviseurNom:"Camille",peutGererPedagogie:false,actif:true};
@@ -256,5 +256,37 @@ describe("cycle démonstration Recruteur vers Superviseur", () => {
     const validations=JSON.parse(stockage.get("spv-demo-validations-v1")??"[]");
     expect(validations).toHaveLength(1);
     expect(validations[0]).toMatchObject({ActionProgres:30,Decision:"VALIDEE",AncienNiveau:"ROUGE",NouveauNiveau:"VERT",Superviseur:2});
+  });
+});
+
+
+describe("règles métier du mode démonstration", () => {
+  afterEach(() => {
+    try { sessionStorage.clear(); } catch {}
+    vi.unstubAllGlobals();
+  });
+
+  function installerModeDemo() {
+    const stockage=new Map<string,string>();
+    vi.stubGlobal("sessionStorage",{
+      getItem:(k:string)=>stockage.get(k)??null,
+      setItem:(k:string,v:string)=>{stockage.set(k,v);},
+      removeItem:(k:string)=>{stockage.delete(k);},
+      clear:()=>stockage.clear(),
+    });
+    vi.stubGlobal("window",{parent:null,location:{search:"?demo=1&role=RECRUTEUR"}});
+    (window as unknown as {parent:unknown}).parent=window;
+  }
+
+  it("exige la prise en compte de la fiche avant déclaration de progression", async () => {
+    installerModeDemo();
+    const action={id:1,ficheVersionId:1,perimetreId:1} as Parameters<typeof declarerProgression>[0];
+    await expect(declarerProgression(action,"",utilisateur,false)).rejects.toThrow(/prise en compte/);
+  });
+
+  it("interdit au recruteur de définir une échéance même en démonstration", async () => {
+    installerModeDemo();
+    const action={id:1,perimetreId:1} as Parameters<typeof definirEcheance>[0];
+    await expect(definirEcheance(action,"2026-12-01",utilisateur)).rejects.toThrow(/superviseur|administrateur/i);
   });
 });
