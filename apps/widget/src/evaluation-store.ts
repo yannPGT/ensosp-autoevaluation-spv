@@ -101,7 +101,7 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
 }
 
 export async function creerEvaluation(utilisateur: UtilisateurCourant): Promise<number> {
-  if(!obtenirDocApiGrist()){const d=lireEvaluationDemo();if(d.evaluationId&&d.statut==="BROUILLON")return d.evaluationId;const id=9001;ecrireEvaluationDemo({evaluationId:id,reponses:{},statut:"BROUILLON",verrouillee:false});return id;}
+  if(!obtenirDocApiGrist()){const d=lireEvaluationDemo();if(d.evaluationId&&d.statut==="BROUILLON")return d.evaluationId;let id=9001;try{const h=JSON.parse(sessionStorage.getItem("spv-demo-historique-v1")||"[]") as Array<{evaluationId?:number}>;const ids=h.map(e=>e.evaluationId).filter((v):v is number=>typeof v==="number"&&Number.isFinite(v));if(ids.length)id=Math.max(9000,...ids)+1;}catch{}ecrireEvaluationDemo({evaluationId:id,reponses:{},statut:"BROUILLON",verrouillee:false});return id;}
   const api = exigerApi();
   const [utilisateurs, campagnes, evaluationsExistantes, axes, indicateurs, criteres] = await Promise.all([
     api.fetchTable("Utilisateurs"),
