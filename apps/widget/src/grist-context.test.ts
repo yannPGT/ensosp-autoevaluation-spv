@@ -53,6 +53,20 @@ describe("cloisonnement du mode démonstration", () => {
     expect(() => obtenirDocApiGrist()).toThrow(/document Grist/);
   });
 
+  it("refuse un rôle prototype hors Grist sans demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "?role=RECRUTEUR" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { chargerUtilisateurCourant } = await import("./grist-context.js");
+    await expect(chargerUtilisateurCourant()).rejects.toThrow(/document Grist/);
+  });
+
+  it("autorise le profil prototype uniquement avec demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "?demo=1&role=RECRUTEUR" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { chargerUtilisateurCourant } = await import("./grist-context.js");
+    await expect(chargerUtilisateurCourant()).resolves.toMatchObject({ role: "RECRUTEUR" });
+  });
+
   it("neutralise explicitement l API avec demo=1", async () => {
     vi.stubGlobal("window", { parent: null, location: { search: "?demo=1&role=RECRUTEUR" } });
     (window as unknown as {parent:unknown}).parent = window;
