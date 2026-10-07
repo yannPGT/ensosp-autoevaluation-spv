@@ -59,7 +59,7 @@ export async function chargerDonneesAffectations(): Promise<DonneesAffectations>
 export async function creerAffectation(saisie: NouvelleAffectation, donnees: DonneesAffectations, acteurId: number): Promise<void> {
   validerNouvelleAffectation(saisie, donnees);
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { creerAffectationDemo(saisie); return; }
   const ids = perimetresActifsDuSuperviseur(saisie.superviseurId, donnees, saisie.perimetreId);
   await docApi.applyUserActions([
     ["AddRecord", "AffectationsSuperviseurs", null, {
@@ -74,7 +74,7 @@ export async function creerAffectation(saisie: NouvelleAffectation, donnees: Don
 export async function cloturerAffectation(affectationId: number, dateFin: string, donnees: DonneesAffectations, acteurId: number): Promise<void> {
   const affectation = validerCloture(affectationId, dateFin, donnees);
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { cloturerAffectationDemo(affectationId,dateFin); return; }
   const idsRestants = perimetresActifsDuSuperviseur(affectation.superviseurId, donnees, undefined, affectation.id);
   await docApi.applyUserActions([
     ["UpdateRecord", "AffectationsSuperviseurs", affectation.id, { DateFin: dateVersTimestamp(dateFin), Actif: false }],
@@ -87,7 +87,7 @@ export async function synchroniserSuperviseur(superviseurId: number, donnees: Do
   const superviseur = donnees.superviseurs.find((element) => element.id === superviseurId);
   if (!superviseur) throw new Error("Le superviseur est introuvable.");
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("La synchronisation est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { synchroniserSuperviseurDemo(superviseurId,donnees); return; }
   const ids = perimetresActifsDuSuperviseur(superviseurId, donnees);
   await docApi.applyUserActions([["UpdateRecord", "Utilisateurs", superviseurId, { PerimetresSupervises: ["L", ...ids] }], ["AddRecord", "JournalAudit", null, { Uid: crypto.randomUUID(), Acteur: acteurId, Perimetre: null, TypeObjet: "AFFECTATION", ObjetUid: String(superviseurId), Action: "SYNCHRONISATION_AFFECTATIONS", Resume: `Affectations synchronisées pour ${superviseur.nom}` }]]);
 }
@@ -185,6 +185,13 @@ function perimetresActifsDuSuperviseur(superviseurId: number, donnees: DonneesAf
   return idsUniques(ids);
 }
 
+const CLE_DEMO_AFFECTATIONS="spv-demo-admin-affectations-v1";
+type AffectationDemo={id:number;superviseurId:number;perimetreId:number;dateDebut:number;dateFin:number|null;actif:boolean};
+function lireAffectationsDemo():AffectationDemo[]{try{const b=sessionStorage.getItem(CLE_DEMO_AFFECTATIONS);if(b)return JSON.parse(b) as AffectationDemo[];}catch{}return[];}
+function ecrireAffectationsDemo(v:AffectationDemo[]){try{sessionStorage.setItem(CLE_DEMO_AFFECTATIONS,JSON.stringify(v));}catch{}}
+function creerAffectationDemo(s:NouvelleAffectation){const v=lireAffectationsDemo();v.push({id:100+v.length,superviseurId:s.superviseurId,perimetreId:s.perimetreId,dateDebut:dateVersTimestamp(s.dateDebut)!,dateFin:null,actif:true});ecrireAffectationsDemo(v);}
+function cloturerAffectationDemo(id:number,dateFin:string){const v=lireAffectationsDemo();const a=v.find(x=>x.id===id);if(a){a.dateFin=dateVersTimestamp(dateFin);a.actif=false;ecrireAffectationsDemo(v);}}
+function synchroniserSuperviseurDemo(_id:number,_d:DonneesAffectations){/* Les affectations constituent la source locale de vérité en démonstration. */}
 function donneesDemonstration(): DonneesAffectations {
   return construireDonneesAffectations({
     id: [2, 3], Prenom: ["Camille", "Nora"], Nom: ["BERNARD", "DUPONT"], Email: ["camille@example.invalid", "nora@example.invalid"],
