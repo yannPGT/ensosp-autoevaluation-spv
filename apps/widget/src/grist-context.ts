@@ -23,7 +23,7 @@ const TABLE_CONTEXTE = "ContexteWidget";
 
 export async function chargerUtilisateurCourant(): Promise<UtilisateurCourant> {
   if (window.parent === window) {
-    if (new URLSearchParams(window.location.search).has("role")) return utilisateurPrototype();
+    if (estModeDemonstration() && new URLSearchParams(window.location.search).has("role")) return utilisateurPrototype();
     throw new Error("Ce widget doit être ouvert depuis votre document Grist.");
   }
   const grist = window.grist;
