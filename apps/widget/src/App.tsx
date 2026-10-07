@@ -476,7 +476,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
         setEtatSauvegarde("Dernière évaluation validée chargée");
       } else {
         setEtape("QUESTIONNAIRE");
-        setEtatSauvegarde(session.evaluationId ? "Brouillon Grist chargé" : "Le brouillon sera créé à la première réponse");
+        setEtatSauvegarde(session.evaluationId ? (new URLSearchParams(window.location.search).get("demo") === "1" ? "Brouillon de démonstration chargé" : "Brouillon Grist chargé") : "Le brouillon sera créé à la première réponse");
       }
     }).catch((erreur: unknown) => {
       if (actif) {
@@ -502,8 +502,9 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     return () => window.removeEventListener("beforeunload", avertirSortie);
   }, [reponsesNonEnregistrees]);
 
+  const modeDemoEvaluation = new URLSearchParams(window.location.search).get("demo") === "1";
+  const libelleStockage = modeDemoEvaluation ? "dans cette session de démonstration" : "dans Grist";
   const assurerEvaluation = async () => {
-    if (window.parent === window) return -1;
     if (evaluationId) return evaluationId;
     if (!creationEnCours.current) creationEnCours.current = creerEvaluation(utilisateur);
     const id = await creationEnCours.current;
@@ -513,16 +514,16 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
 
   const choisirReponse = async (code: string, niveau: Niveau) => {
     setReponses((courantes) => ({ ...courantes, [code]: niveau }));
-    setEtatSauvegarde("Enregistrement dans Grist…");
+    setEtatSauvegarde(`Enregistrement ${libelleStockage}…`);
     setErreurSauvegarde("");
     setSauvegardesEnCours((nombre) => nombre + 1);
     derniereSauvegarde.current = derniereSauvegarde.current.catch(() => undefined).then(async () => {
       try {
         const id = await assurerEvaluation();
-        if (id !== -1) await enregistrerReponse(id, code, niveau);
+        await enregistrerReponse(id, code, niveau);
         setReponsesSauvegardees((courantes) => ({ ...courantes, [code]: niveau }));
         setErreurSauvegarde("");
-        setEtatSauvegarde("Brouillon enregistré dans Grist");
+        setEtatSauvegarde(`Brouillon enregistré ${libelleStockage}`);
       } finally {
         setSauvegardesEnCours((nombre) => Math.max(0, nombre - 1));
       }
@@ -534,7 +535,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     }
   };
 
-  if (!sessionChargee || !questionnaire) return <section className="page-carte"><p>Chargement du questionnaire depuis le référentiel Grist…</p></section>;
+  if (!sessionChargee || !questionnaire) return <section className="page-carte"><p>{modeDemoEvaluation ? "Chargement du questionnaire de démonstration…" : "Chargement du questionnaire depuis le référentiel Grist…"}</p></section>;
   if (etape === "BILAN") return <Bilan questionnaire={questionnaire} reponses={reponses} modifier={() => setEtape("FINALISEE")} />;
   if (etape === "FINALISEE") {
     const contact = utilisateur.superviseurNom && utilisateur.superviseurNom !== "Non renseigné"
@@ -567,16 +568,16 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     if (!aSauvegarder.length) return;
     setOperationEvaluation(true);
     setSauvegardesEnCours(aSauvegarder.length);
-    setEtatSauvegarde("Nouvelle tentative d’enregistrement dans Grist…");
+    setEtatSauvegarde(`Nouvelle tentative d’enregistrement ${libelleStockage}…`);
     setErreurSauvegarde("");
     try {
       const id = await assurerEvaluation();
       for (const [code, niveau] of aSauvegarder) {
-        if (id !== -1) await enregistrerReponse(id, code, niveau);
+        await enregistrerReponse(id, code, niveau);
         setReponsesSauvegardees((courantes) => ({ ...courantes, [code]: niveau }));
         setSauvegardesEnCours((nombre) => Math.max(0, nombre - 1));
       }
-      setEtatSauvegarde("Brouillon enregistré dans Grist");
+      setEtatSauvegarde(`Brouillon enregistré ${libelleStockage}`);
     } catch (erreur) {
       setSauvegardesEnCours(0);
       setEtatSauvegarde("Non enregistré — vous pouvez réessayer sans ressaisir votre réponse.");
@@ -609,10 +610,8 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
       try {
         await derniereSauvegarde.current;
         const id = await assurerEvaluation();
-        if (id !== -1) {
-          const resultat = await validerEvaluation(id, utilisateur);
-          setAvertissementFinalisation(resultat.avertissement ?? "");
-        }
+        const resultat = await validerEvaluation(id, utilisateur);
+        setAvertissementFinalisation(resultat.avertissement ?? "");
         setEtatSauvegarde("Évaluation validée");
         setEtape("FINALISEE");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -657,7 +656,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
           <button type="submit" disabled={!complet || operationEvaluation}>Valider mon auto-évaluation</button>
         </div>
         <p className="message-formulaire" aria-live="polite">
-          {sauvegardesEnCours > 0 ? "Enregistrement dans Grist…" : reponsesNonEnregistrees ? "Non enregistré — vous pouvez réessayer sans ressaisir votre réponse." : etatSauvegarde}
+          {sauvegardesEnCours > 0 ? `Enregistrement ${libelleStockage}…` : reponsesNonEnregistrees ? "Non enregistré — vous pouvez réessayer sans ressaisir votre réponse." : etatSauvegarde}
         </p>
         {erreurSauvegarde && <p className="message-formulaire message-erreur" role="alert">{erreurSauvegarde}</p>}
         {reponsesNonEnregistrees && sauvegardesEnCours === 0 && <div className="message-formulaire message-avertissement" role="status">
