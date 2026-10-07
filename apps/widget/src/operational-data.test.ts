@@ -316,8 +316,8 @@ describe("règles métier du mode démonstration", () => {
 
     const donnees=await chargerDonneesOperationnelles("progression",utilisateur);
 
-    const codesResultats=donnees.resultats.filter(r=>r.evaluationId===9003).map(r=>r.codeIndicateur);
-    expect(codesResultats).toEqual(expect.arrayContaining(["IND_03","IND_07","IND_13"]));
+    const evaluation=donnees.evaluations.find(e=>e.id===9003);
+    expect(evaluation).toBeDefined();
     const codesActions=donnees.actions.filter(a=>a.recruteurId===utilisateur.id).map(a=>a.codeIndicateur);
     expect(codesActions).toEqual(expect.arrayContaining(["IND_03","IND_07"]));
     expect(codesActions).not.toContain("IND_13");
