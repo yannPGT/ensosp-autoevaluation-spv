@@ -103,7 +103,8 @@ export function construireUtilisateur(
 }
 
 export function obtenirDocApiGrist(): DocApiGrist | null {
-  if (window.parent === window) return null;
+  const demo = new URLSearchParams(window.location.search).get("demo") === "1";
+  if (demo || window.parent === window) return null;
   return window.grist?.docApi ?? null;
 }
 
