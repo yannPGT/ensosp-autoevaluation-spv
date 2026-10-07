@@ -228,11 +228,11 @@ export async function validerEvaluation(evaluationId: number, utilisateur: Utili
   const perimetre = referenceId(evaluations.Perimetre?.[ei]);
   if (!recruteur || !perimetre) throw new Error("Le contexte recruteur ou périmètre de cette évaluation est incomplet.");
 
-  const questionnaireFige = questionnaireDepuisSnapshot(evaluations.ReferentielSnapshot?.[ei]);
+  const questionnaireFige = questionnaireDepuisSnapshot(texte(evaluations.ReferentielSnapshot?.[ei]));
   const questionnaire = questionnaireFige ?? chargerQuestionnaireDepuisTables(axes, indicateurs, criteres);
   const indicateursQuestionnaireActifs = indicateursQuestionnaire(questionnaire);
   const codesAutorises = new Set(indicateursQuestionnaireActifs.map((indicateur) => indicateur.code));
-  const codesObligatoires = new Set(indicateursQuestionnaireActifs.filter((indicateur) => indicateur.obligatoire !== false).map((indicateur) => indicateur.code));
+  const codesObligatoires = new Set(indicateursQuestionnaireActifs.map((indicateur) => indicateur.code));
   const obligatoires = new Set<number>();
   const autorises = new Set<number>();
   (indicateurs.id ?? []).forEach((v, i) => {
