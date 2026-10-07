@@ -59,7 +59,7 @@ export async function chargerDonneesUtilisateurs(): Promise<DonneesUtilisateurs>
 
 export async function enregistrerUtilisateur(saisie: SaisieUtilisateur, acteur: Pick<UtilisateurCourant, "id" | "email">): Promise<void> {
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { preparerChampsUtilisateur(saisie); enregistrerUtilisateurDemo(saisie); return; }
   const champs = preparerChampsUtilisateur(saisie);
   const action = saisie.id
     ? ["UpdateRecord", "Utilisateurs", saisie.id, champs]
@@ -167,15 +167,20 @@ function construireReferences(table: TableGrist, avecEntite = false): ReferenceA
   return references.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 }
 
+const CLE_DEMO_UTILISATEURS="spv-demo-admin-utilisateurs-v1";
+let utilisateursDemo:SaisieUtilisateur[]=[];
+function enregistrerUtilisateurDemo(s:SaisieUtilisateur):void{const id=s.id??(100+utilisateursDemo.length);utilisateursDemo=utilisateursDemo.filter(x=>x.id!==id).concat({...s,id});try{sessionStorage.setItem(CLE_DEMO_UTILISATEURS,JSON.stringify(utilisateursDemo));}catch{}}
 function donneesDemonstration(): DonneesUtilisateurs {
   const entites: ReferenceAdministration[] = [{ id: 1, code: "ENSOSPP", nom: "ENSOSPP", actif: true }];
   const perimetres: ReferenceAdministration[] = [{ id: 1, code: "NATIONAL", nom: "Périmètre national", entiteId: 1, actif: true }];
+  try{const b=sessionStorage.getItem(CLE_DEMO_UTILISATEURS);if(b)utilisateursDemo=JSON.parse(b) as SaisieUtilisateur[];}catch{}
+  const extras=utilisateursDemo;
   return construireDonneesUtilisateurs({
-    id: [1, 2, 3], Email: ["alex@example.invalid", "camille@example.invalid", "morgan@example.invalid"],
-    Nom: ["MARTIN", "BERNARD", "ROBERT"], Prenom: ["Alex", "Camille", "Morgan"],
-    Role: ["ADMIN", "SUPERVISEUR", "RECRUTEUR"], PeutGererPedagogie: [true, false, false],
-    Entite: [1, 1, 1], PerimetrePrincipal: [1, 1, 1], PerimetresSupervises: [["L"], ["L", 1], ["L"]],
-    Actif: [true, true, false], DateActivation: [1_700_006_400, 1_700_006_400, 1_700_006_400], DateDesactivation: [null, null, 1_730_000_000],
+    id: [1, 2, 3,...extras.map(x=>x.id!)], Email: ["alex@example.invalid", "camille@example.invalid", "morgan@example.invalid",...extras.map(x=>x.email)],
+    Nom: ["MARTIN", "BERNARD", "ROBERT",...extras.map(x=>x.nom)], Prenom: ["Alex", "Camille", "Morgan",...extras.map(x=>x.prenom)],
+    Role: ["ADMIN", "SUPERVISEUR", "RECRUTEUR",...extras.map(x=>x.role)], PeutGererPedagogie: [true, false, false,...extras.map(x=>x.role==="ADMIN")],
+    Entite: [1, 1, 1,...extras.map(x=>x.entiteId)], PerimetrePrincipal: [1, 1, 1,...extras.map(x=>x.perimetrePrincipalId)], PerimetresSupervises: [["L"], ["L", 1], ["L"],...extras.map(()=>["L"])],
+    Actif: [true, true, false,...extras.map(x=>x.actif)], DateActivation: [1_700_006_400, 1_700_006_400, 1_700_006_400,...extras.map(()=>Math.floor(Date.now()/1000))], DateDesactivation: [null, null, 1_730_000_000,...extras.map(x=>x.actif?null:Math.floor(Date.now()/1000))],
   }, referencesVersTable(entites), referencesVersTable(perimetres, true));
 }
 
