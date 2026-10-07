@@ -3,6 +3,7 @@ import { chargerTableauDeBord, LignePilotage, PersonnelTableauDeBord, SyntheseAx
 import { Niveau } from "./evaluation-data.js";
 import { chargerSessionEvaluation, creerEvaluation, enregistrerReponse, validerEvaluation } from "./evaluation-store.js";
 import { indicateursQuestionnaire, questionnaireHistorique, QuestionnaireDefinition } from "./questionnaire-data.js";
+import { utilisateurPrototype } from "./portal-data.js";
 import { compterReponsesNonEnregistrees, messageEchecSauvegarde } from "./questionnaire-state.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import { ModuleUtilisateurs } from "./UsersModule.js";
@@ -42,6 +43,7 @@ export function App() {
     { statut: "erreur"; message: string }
   >({ statut: "chargement" });
   const [tentativeConnexion, setTentativeConnexion] = useState(0);
+  const modeDemo = new URLSearchParams(window.location.search).get("demo") === "1";
   const [tentativeTableau, setTentativeTableau] = useState(0);
   const [etatTableau, setEtatTableau] = useState<EtatTableauDeBord>({ statut: "chargement" });
   const [pageActive, setPageActive] = useState("accueil");
@@ -62,14 +64,14 @@ export function App() {
   useEffect(() => {
     let actif = true;
     setEtatUtilisateur({ statut: "chargement" });
-    chargerUtilisateurCourant()
+    (modeDemo ? Promise.resolve(utilisateurPrototype()) : chargerUtilisateurCourant())
       .then((profil) => { if (actif) setEtatUtilisateur({ statut: "pret", utilisateur: profil }); })
       .catch((erreur: unknown) => {
         const message = erreur instanceof Error ? erreur.message : "Une erreur inconnue empêche l’identification.";
         if (actif) setEtatUtilisateur({ statut: "erreur", message });
       });
     return () => { actif = false; };
-  }, [tentativeConnexion]);
+  }, [tentativeConnexion, modeDemo]);
 
   useEffect(() => {
     if (!utilisateur) return;
@@ -94,7 +96,8 @@ export function App() {
 
   return (
     <main>
-      <Bandeau utilisateur={utilisateur} nomApplication={nom} />
+      <Bandeau utilisateur={utilisateur} nomApplication={nom} modeDemo={modeDemo} />
+      {modeDemo && <BandeauDemonstration utilisateur={utilisateur} />}
       <div className="application-shell">
         <MenuNavigation menu={menu} pageActive={pageActive} changerPage={setPageActive} />
         <div className="contenu-application">
@@ -159,7 +162,7 @@ function EcranConnexion({ titre, message, reessayer }: { titre: string; message:
   );
 }
 
-function Bandeau({ utilisateur, nomApplication }: { utilisateur: UtilisateurCourant; nomApplication: string }) {
+function Bandeau({ utilisateur, nomApplication, modeDemo = false }: { utilisateur: UtilisateurCourant; nomApplication: string; modeDemo?: boolean }) {
   return (
     <header>
       <span className="badge-beta">Bêta</span>
@@ -170,10 +173,25 @@ function Bandeau({ utilisateur, nomApplication }: { utilisateur: UtilisateurCour
         <span>{utilisateur.perimetrePrincipal}</span>
         {utilisateur.role === "RECRUTEUR" && <span>Superviseur : {utilisateur.superviseurNom}</span>}
       </div>
-      <p>Questionnaire administrable · vos données restent protégées par Grist</p>
+      <p>{modeDemo ? "Mode démonstration · données fictives locales · aucune connexion à Grist" : "Questionnaire administrable · vos données restent protégées par Grist"}</p>
       <p className="version-widget">Version 1.0 · © YannPGT</p>
     </header>
   );
+}
+
+function BandeauDemonstration({ utilisateur }: { utilisateur: UtilisateurCourant }) {
+  const changerRole = (role: "ADMIN" | "SUPERVISEUR" | "RECRUTEUR") => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("demo", "1");
+    url.searchParams.set("role", role);
+    window.location.href = url.toString();
+  };
+  return <section className="bandeau-demonstration" aria-label="Mode démonstration">
+    <div><strong>MODE DÉMONSTRATION · DONNÉES FICTIVES</strong><span>Aucun accès à Grist ou ProConnect. Les actions sont simulées dans le navigateur.</span></div>
+    <div className="profils-demonstration">
+      {(["RECRUTEUR","SUPERVISEUR","ADMIN"] as const).map((role) => <button type="button" className={utilisateur.role === role ? "profil-demo-actif" : ""} onClick={() => changerRole(role)} key={role}>{libellesRoles[role]}</button>)}
+    </div>
+  </section>;
 }
 
 function MenuNavigation({ menu, pageActive, changerPage }: {
