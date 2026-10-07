@@ -103,7 +103,8 @@ export function construireUtilisateur(
 }
 
 export function estModeDemonstration(): boolean {
-  return new URLSearchParams(window.location.search).get("demo") === "1";
+  if (typeof window === "undefined" || !window.location) return false;
+  return new URLSearchParams(window.location.search ?? "").get("demo") === "1";
 }
 
 export function obtenirDocApiGrist(): DocApiGrist | null {
