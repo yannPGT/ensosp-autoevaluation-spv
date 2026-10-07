@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { construireDonneesReferentiel, validerAxe, validerCampagne, validerCritere, validerIndicateur } from "./reference-data.js";
+import { chargerDonneesReferentiel, construireDonneesReferentiel, validerAxe, validerCampagne, validerCritere, validerIndicateur } from "./reference-data.js";
 
 function donnees() {
   return construireDonneesReferentiel(
@@ -14,6 +14,17 @@ function donnees() {
 }
 
 describe("données du module Référentiel", () => {
+  it("expose les 13 indicateurs avec les trois niveaux en démonstration", async () => {
+    window.history.replaceState({}, "", "/?demo=1&role=ADMIN");
+    sessionStorage.clear();
+    const resultat = await chargerDonneesReferentiel();
+    expect(resultat.indicateurs).toHaveLength(13);
+    for (const indicateur of resultat.indicateurs) {
+      const niveaux = new Set(resultat.criteres.filter((critere) => critere.indicateurId === indicateur.id && critere.actif).map((critere) => critere.niveau));
+      expect(niveaux, indicateur.code).toEqual(new Set(["ROUGE", "ORANGE", "VERT"]));
+    }
+  });
+
   it("résout les relations et compte les usages", () => {
     const resultat = donnees();
     expect(resultat.axes[0]).toMatchObject({ indicateurs: 1 });
