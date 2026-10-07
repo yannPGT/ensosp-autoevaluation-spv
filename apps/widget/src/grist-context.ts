@@ -102,9 +102,13 @@ export function construireUtilisateur(
   };
 }
 
+export function estModeDemonstration(): boolean {
+  return new URLSearchParams(window.location.search).get("demo") === "1";
+}
+
 export function obtenirDocApiGrist(): DocApiGrist | null {
-  const demo = new URLSearchParams(window.location.search).get("demo") === "1";
-  if (demo || window.parent === window) return null;
+  if (estModeDemonstration()) return null;
+  if (window.parent === window) throw new Error("Ce widget doit être ouvert depuis votre document Grist.");
   return window.grist?.docApi ?? null;
 }
 
