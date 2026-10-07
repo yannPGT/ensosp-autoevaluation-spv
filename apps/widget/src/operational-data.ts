@@ -99,8 +99,9 @@ function appliquerEvaluationDemo(tables:[TableGrist,TableGrist,TableGrist,TableG
     if(!d.evaluationId||d.statut!=="VALIDEE")return;
     const indicateurs=tables[4], ids=new Map<string,number>(); (indicateurs.id??[]).forEach((v,i)=>{if(typeof v==="number")ids.set(texte(indicateurs.Code?.[i]),v);});
     const codes=Object.keys(d.reponses); const repIds=codes.map((_,i)=>9000+i);
-    tables[2]={id:[d.evaluationId],Uid:["DEMO-EVAL"],Recruteur:[3],Perimetre:[1],Statut:["VALIDEE"],ProgressionComplete:[100],DateDebut:[Math.floor(Date.now()/1000)-3600],DateValidation:[Math.floor(Date.now()/1000)],ReferentielVersion:["demo-session"]};
-    tables[3]={id:repIds,Evaluation:codes.map(()=>d.evaluationId),Indicateur:codes.map(code=>ids.get(code)??0),Niveau:codes.map(code=>d.reponses[code]),CommentaireRecruteur:codes.map(()=>"")};
+    const ajouter=(table:TableGrist,valeurs:Record<string,unknown>)=>{for(const [k,v] of Object.entries(valeurs))table[k]=(table[k]??[]).concat(v);};
+    ajouter(tables[2],{id:d.evaluationId,Uid:`DEMO-EVAL-${d.evaluationId}`,Recruteur:3,Perimetre:1,Statut:"VALIDEE",ProgressionComplete:100,DateDebut:Math.floor(Date.now()/1000)-3600,DateValidation:Math.floor(Date.now()/1000),ReferentielVersion:"demo-session"});
+    codes.forEach((code,i)=>ajouter(tables[3],{id:repIds[i],Evaluation:d.evaluationId,Indicateur:ids.get(code)??0,Niveau:d.reponses[code],CommentaireRecruteur:""}));
     const perfectibles=codes.filter(code=>d.reponses[code]!=="VERT"&&ids.has(code));
     tables[5]={id:perfectibles.map((_,i)=>9100+i),Uid:perfectibles.map((_,i)=>`DEMO-ACT-${i+1}`),Recruteur:perfectibles.map(()=>3),Perimetre:perfectibles.map(()=>1),Indicateur:perfectibles.map(code=>ids.get(code)!),NiveauInitial:perfectibles.map(code=>d.reponses[code]),NiveauCourant:perfectibles.map(code=>d.reponses[code]),Statut:perfectibles.map(()=>"A_FAIRE"),Echeance:perfectibles.map(()=>0),CommentaireRecruteur:perfectibles.map(()=>""),CommentaireSuperviseur:perfectibles.map(()=>""),PriseEnCompteFiche:perfectibles.map(()=>false),FicheVersion:perfectibles.map(code=>code==="IND_01"?1:null)};
     const memorisees=demoActions??lireActionsDemo();if(memorisees)tables[5]=memorisees;else ecrireActionsDemo(tables[5]);
