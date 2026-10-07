@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chargerDonneesOperationnelles, construireDonneesOperationnelles, deciderAction, declarerProgression, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante, rouvrirAction } from "./operational-data.js";
+import { chargerDonneesOperationnelles, construireDonneesOperationnelles, debloquerEvaluationRecruteur, deciderAction, declarerProgression, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante, rouvrirAction } from "./operational-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
 
 const utilisateur:UtilisateurCourant={id:3,prenom:"Morgan",nom:"ROBERT",email:"m@x",role:"RECRUTEUR",entite:"SDIS",perimetrePrincipal:"Nord",perimetresSupervises:[],superviseurNom:"Camille",peutGererPedagogie:false,actif:true};
@@ -210,5 +210,51 @@ describe("données recruteur et superviseur", () => {
 
     await expect(rattacherFicheManquante(30,40,superviseur)).rejects.toThrow("ne peut pas être remplacée");
     expect(applyUserActions).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("cycle démonstration Recruteur vers Superviseur", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  function installerDemo(role:"RECRUTEUR"|"SUPERVISEUR") {
+    const stockage=new Map<string,string>();
+    vi.stubGlobal("sessionStorage",{
+      getItem:(k:string)=>stockage.get(k)??null,
+      setItem:(k:string,v:string)=>{stockage.set(k,v);},
+      removeItem:(k:string)=>{stockage.delete(k);},
+      clear:()=>stockage.clear(),
+    });
+    vi.stubGlobal("window",{parent:null,location:{search:`?demo=1&role=${role}`}});
+    (window as unknown as {parent:unknown}).parent=window;
+    return stockage;
+  }
+
+  it("conserve une évaluation validée dans l historique lors du déblocage", async () => {
+    const stockage=installerDemo("SUPERVISEUR");
+    stockage.set("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"VERT"},statut:"VALIDEE",verrouillee:true}));
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+
+    await debloquerEvaluationRecruteur(3,superviseur);
+
+    expect(stockage.has("spv-demo-evaluation-v1")).toBe(false);
+    const historique=JSON.parse(stockage.get("spv-demo-historique-v1")??"[]");
+    expect(historique).toHaveLength(1);
+    expect(historique[0]).toMatchObject({evaluationId:9001,statut:"VALIDEE",reponses:{IND_01:"ROUGE",IND_02:"VERT"}});
+  });
+
+  it("persiste la décision du superviseur et le passage au vert", async () => {
+    const stockage=installerDemo("SUPERVISEUR");
+    const action={id:30,uid:"ACT-30",recruteurId:3,recruteur:"Morgan ROBERT",perimetreId:1,perimetre:"Nord",indicateur:"Premier contact",codeIndicateur:"IND_01",niveauInitial:"ROUGE",niveauCourant:"ROUGE",statut:"EN_ATTENTE_VALIDATION",echeance:"",echeanceTimestamp:0,commentaireRecruteur:"",commentaireSuperviseur:"",priseEnCompteFiche:false,ficheVersionId:null,fiche:"—",version:"",nomFichier:"",attachmentId:null} as const;
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+
+    await deciderAction(action,"VALIDEE","VERT","",superviseur);
+
+    const validations=JSON.parse(stockage.get("spv-demo-validations-v1")??"[]");
+    expect(validations).toHaveLength(1);
+    expect(validations[0]).toMatchObject({ActionProgres:30,Decision:"VALIDEE",AncienNiveau:"ROUGE",NouveauNiveau:"VERT",Superviseur:2});
   });
 });
