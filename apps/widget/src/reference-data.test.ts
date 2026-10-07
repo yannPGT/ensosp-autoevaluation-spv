@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { chargerDonneesReferentiel, construireDonneesReferentiel, validerAxe, validerCampagne, validerCritere, validerIndicateur } from "./reference-data.js";
 
 function donnees() {
@@ -14,9 +14,12 @@ function donnees() {
 }
 
 describe("données du module Référentiel", () => {
+  afterEach(() => vi.unstubAllGlobals());
   it("expose les 13 indicateurs avec les trois niveaux en démonstration", async () => {
-    window.history.replaceState({}, "", "/?demo=1&role=ADMIN");
-    sessionStorage.clear();
+    const stockage=new Map<string,string>();
+    vi.stubGlobal("sessionStorage",{getItem:(k:string)=>stockage.get(k)??null,setItem:(k:string,v:string)=>stockage.set(k,v),removeItem:(k:string)=>stockage.delete(k),clear:()=>stockage.clear()});
+    vi.stubGlobal("window",{parent:null,location:{search:"?demo=1&role=ADMIN"}});
+    (window as unknown as {parent:unknown}).parent=window;
     const resultat = await chargerDonneesReferentiel();
     expect(resultat.indicateurs).toHaveLength(13);
     for (const indicateur of resultat.indicateurs) {
