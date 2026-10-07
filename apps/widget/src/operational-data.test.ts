@@ -289,4 +289,18 @@ describe("règles métier du mode démonstration", () => {
     const action={id:1,perimetreId:1} as Parameters<typeof definirEcheance>[0];
     await expect(definirEcheance(action,"2026-12-01",utilisateur)).rejects.toThrow(/superviseur|administrateur/i);
   });
+
+  it("conserve le cycle 9001 archivé lorsque le cycle 9002 est validé", async () => {
+    const stockage=installerDemo("RECRUTEUR");
+    stockage.set("spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"VERT"},statut:"VALIDEE",archiveeLe:1750000000}]));
+    stockage.set("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9002,reponses:{IND_01:"VERT",IND_02:"ORANGE"},statut:"VALIDEE",verrouillee:true}));
+
+    const donnees=await chargerDonneesOperationnelles("historique",utilisateur);
+
+    const ids=donnees.evaluations.map(e=>e.id);
+    expect(ids).toContain(9001);
+    expect(ids).toContain(9002);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
 });
