@@ -176,15 +176,16 @@ function enregistrerEntiteDemo(s:SaisieEntite){const e=lireTerritoiresDemo(),id=
 function enregistrerPerimetreDemo(s:SaisiePerimetre){const e=lireTerritoiresDemo(),id=s.id??(200+e.perimetres.length);e.perimetres=e.perimetres.filter(x=>x.id!==id).concat({...s,id});ecrireTerritoiresDemo(e);}
 function donneesDemonstration(): DonneesTerritoires {
   const d=lireTerritoiresDemo();
+  const baseEntites:SaisieEntite[]=[{id:1,code:"ENSOSPP",nom:"ENSOSPP",parentId:0,actif:true},{id:2,code:"SIS_33",nom:"SDIS de la Gironde",parentId:1,actif:true}];
+  const basePerimetres:SaisiePerimetre[]=[{id:11,code:"PER_33_GLOBAL",nom:"SDIS 33 global",entiteId:2,actif:true},{id:12,code:"PER_33_NORD",nom:"Groupement Nord",entiteId:2,actif:true}];
+  const re=new Map(d.entites.filter(x=>x.id&&x.id<=2).map(x=>[x.id!,x])),rp=new Map(d.perimetres.filter(x=>x.id&&x.id<=12).map(x=>[x.id!,x]));
+  const entites=baseEntites.map(x=>re.get(x.id!)??x).concat(d.entites.filter(x=>(x.id??0)>2));
+  const perimetres=basePerimetres.map(x=>rp.get(x.id!)??x).concat(d.perimetres.filter(x=>(x.id??0)>12));
   return construireDonneesTerritoires({
-    id: [1, 2,...d.entites.map(x=>x.id!)], Code: ["ENSOSPP", "SIS_33",...d.entites.map(x=>normaliserCode(x.code))], Nom: ["ENSOSPP", "SDIS de la Gironde",...d.entites.map(x=>x.nom)], Parent: [null, 1,...d.entites.map(x=>x.parentId||null)], Actif: [true, true,...d.entites.map(x=>x.actif)],
+    id:entites.map(x=>x.id!),Code:entites.map(x=>normaliserCode(x.code)),Nom:entites.map(x=>x.nom),Parent:entites.map(x=>x.parentId||null),Actif:entites.map(x=>x.actif),
   }, {
-    id: [11, 12,...d.perimetres.map(x=>x.id!)], Code: ["PER_33_GLOBAL", "PER_33_NORD",...d.perimetres.map(x=>normaliserCode(x.code))], Nom: ["SDIS 33 global", "Groupement Nord",...d.perimetres.map(x=>x.nom)], Entite: [2, 2,...d.perimetres.map(x=>x.entiteId)], Actif: [true, true,...d.perimetres.map(x=>x.actif)],
-  }, {
-    id: [7], Entite: [2], PerimetrePrincipal: [12], Actif: [true],
-  }, {
-    id: [4], Perimetre: [12], Actif: [true],
-  });
+    id:perimetres.map(x=>x.id!),Code:perimetres.map(x=>normaliserCode(x.code)),Nom:perimetres.map(x=>x.nom),Entite:perimetres.map(x=>x.entiteId),Actif:perimetres.map(x=>x.actif),
+  }, {id:[7],Entite:[2],PerimetrePrincipal:[12],Actif:[true]}, {id:[4],Perimetre:[12],Actif:[true]});
 }
 
 function normaliserCode(valeur: string): string { return valeur.trim().toLocaleUpperCase("fr").replace(/[\s-]+/g, "_"); }
