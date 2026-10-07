@@ -1,3 +1,4 @@
+import { urlPdfPresentationDemo } from "./demo-pdf.js";
 import { obtenirDocApiGrist, TableGrist } from "./grist-context.js";
 import { formaterNumeroVersion } from "./version-number.js";
 import { taillePdfMaxMo } from "./settings-data.js";
