@@ -304,4 +304,23 @@ describe("règles métier du mode démonstration", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it("génère les résultats et actions pour les indicateurs au-delà de IND_02", async () => {
+    installerModeDemo();
+    const stockage=sessionStorage as unknown as {setItem:(k:string,v:string)=>void};
+    stockage.setItem("spv-demo-evaluation-v1",JSON.stringify({
+      evaluationId:9003,
+      reponses:{IND_03:"ROUGE",IND_07:"ORANGE",IND_13:"VERT"},
+      statut:"VALIDEE",
+      verrouillee:true,
+    }));
+
+    const donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+
+    const codesResultats=donnees.resultats.filter(r=>r.evaluationId===9003).map(r=>r.codeIndicateur);
+    expect(codesResultats).toEqual(expect.arrayContaining(["IND_03","IND_07","IND_13"]));
+    const codesActions=donnees.actions.filter(a=>a.recruteurId===utilisateur.id).map(a=>a.codeIndicateur);
+    expect(codesActions).toEqual(expect.arrayContaining(["IND_03","IND_07"]));
+    expect(codesActions).not.toContain("IND_13");
+  });
+
 });
