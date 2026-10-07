@@ -169,18 +169,24 @@ function construireReferences(table: TableGrist, avecEntite = false): ReferenceA
 
 const CLE_DEMO_UTILISATEURS="spv-demo-admin-utilisateurs-v1";
 let utilisateursDemo:SaisieUtilisateur[]=[];
-function enregistrerUtilisateurDemo(s:SaisieUtilisateur):void{const id=s.id??(100+utilisateursDemo.length);utilisateursDemo=utilisateursDemo.filter(x=>x.id!==id).concat({...s,id});try{sessionStorage.setItem(CLE_DEMO_UTILISATEURS,JSON.stringify(utilisateursDemo));}catch{}}
+function chargerUtilisateursDemo():void{try{const b=sessionStorage.getItem(CLE_DEMO_UTILISATEURS);utilisateursDemo=b?JSON.parse(b) as SaisieUtilisateur[]:[];}catch{utilisateursDemo=[];}}
+function enregistrerUtilisateurDemo(s:SaisieUtilisateur):void{chargerUtilisateursDemo();const id=s.id??Math.max(99,...utilisateursDemo.map(x=>x.id??0))+1;utilisateursDemo=utilisateursDemo.filter(x=>x.id!==id).concat({...s,id});try{sessionStorage.setItem(CLE_DEMO_UTILISATEURS,JSON.stringify(utilisateursDemo));}catch{}}
 function donneesDemonstration(): DonneesUtilisateurs {
   const entites: ReferenceAdministration[] = [{ id: 1, code: "ENSOSPP", nom: "ENSOSPP", actif: true }];
   const perimetres: ReferenceAdministration[] = [{ id: 1, code: "NATIONAL", nom: "Périmètre national", entiteId: 1, actif: true }];
-  try{const b=sessionStorage.getItem(CLE_DEMO_UTILISATEURS);if(b)utilisateursDemo=JSON.parse(b) as SaisieUtilisateur[];}catch{}
-  const extras=utilisateursDemo;
+  chargerUtilisateursDemo();
+  const base:SaisieUtilisateur[]=[
+    {id:1,actifInitial:true,email:"alex.martin@example.invalid",nom:"MARTIN",prenom:"Alex",role:"ADMIN",peutGererPedagogie:true,entiteId:1,perimetrePrincipalId:1,actif:true},
+    {id:2,actifInitial:true,email:"camille.bernard@example.invalid",nom:"BERNARD",prenom:"Camille",role:"SUPERVISEUR",peutGererPedagogie:false,entiteId:1,perimetrePrincipalId:1,actif:true},
+    {id:3,actifInitial:false,email:"morgan.robert@example.invalid",nom:"ROBERT",prenom:"Morgan",role:"RECRUTEUR",peutGererPedagogie:false,entiteId:1,perimetrePrincipalId:1,actif:false},
+  ];
+  const remplacements=new Map(utilisateursDemo.filter(x=>x.id&&x.id<=3).map(x=>[x.id!,x]));
+  const utilisateurs=base.map(x=>remplacements.get(x.id!)??x).concat(utilisateursDemo.filter(x=>(x.id??0)>3));
   return construireDonneesUtilisateurs({
-    id: [1, 2, 3,...extras.map(x=>x.id!)], Email: ["alex@example.invalid", "camille@example.invalid", "morgan@example.invalid",...extras.map(x=>x.email)],
-    Nom: ["MARTIN", "BERNARD", "ROBERT",...extras.map(x=>x.nom)], Prenom: ["Alex", "Camille", "Morgan",...extras.map(x=>x.prenom)],
-    Role: ["ADMIN", "SUPERVISEUR", "RECRUTEUR",...extras.map(x=>x.role)], PeutGererPedagogie: [true, false, false,...extras.map(x=>x.role==="ADMIN")],
-    Entite: [1, 1, 1,...extras.map(x=>x.entiteId)], PerimetrePrincipal: [1, 1, 1,...extras.map(x=>x.perimetrePrincipalId)], PerimetresSupervises: [["L"], ["L", 1], ["L"],...extras.map(()=>["L"])],
-    Actif: [true, true, false,...extras.map(x=>x.actif)], DateActivation: [1_700_006_400, 1_700_006_400, 1_700_006_400,...extras.map(()=>Math.floor(Date.now()/1000))], DateDesactivation: [null, null, 1_730_000_000,...extras.map(x=>x.actif?null:Math.floor(Date.now()/1000))],
+    id: utilisateurs.map(x=>x.id!), Email: utilisateurs.map(x=>x.email), Nom: utilisateurs.map(x=>x.nom), Prenom: utilisateurs.map(x=>x.prenom),
+    Role: utilisateurs.map(x=>x.role), PeutGererPedagogie: utilisateurs.map(x=>x.role==="ADMIN"),
+    Entite: utilisateurs.map(x=>x.entiteId), PerimetrePrincipal: utilisateurs.map(x=>x.perimetrePrincipalId), PerimetresSupervises: utilisateurs.map(x=>x.role==="SUPERVISEUR"?["L",1]:["L"]),
+    Actif: utilisateurs.map(x=>x.actif), DateActivation: utilisateurs.map(x=>x.actif?1_700_006_400:null), DateDesactivation: utilisateurs.map(x=>x.actif?null:1_730_000_000),
   }, referencesVersTable(entites), referencesVersTable(perimetres, true));
 }
 
