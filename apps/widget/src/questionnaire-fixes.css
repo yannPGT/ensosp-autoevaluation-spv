@@ -112,3 +112,13 @@ section[aria-labelledby="questionnaire"] form > .message-formulaire[aria-live="p
     max-width: none;
   }
 }
+
+
+.questionnaire-etape { min-height: 360px; }
+.navigation-questionnaire { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid #e1e5ea; }
+.navigation-questionnaire > span { color:#526174; font-weight:700; font-size:.9rem; }
+@media (max-width: 600px) {
+  .questionnaire-etape { min-height: 0; }
+  .navigation-questionnaire { position:sticky; bottom:0; z-index:3; margin-left:-4px; margin-right:-4px; padding:12px 4px; background:#fff; }
+  .navigation-questionnaire button { min-height:44px; }
+}

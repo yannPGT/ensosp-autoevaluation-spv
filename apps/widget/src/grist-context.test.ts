@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { construireUtilisateur } from "./grist-context.js";
 
 const entites = { id: [2], Nom: ["SDIS de test"] };
@@ -39,5 +39,38 @@ describe("construireUtilisateur", () => {
     expect(() => construireUtilisateur(7, {
       id: [7], Actif: [true], Role: ["INVITE"],
     }, entites, perimetres)).toThrow("n’est pas reconnu");
+  });
+});
+
+
+describe("cloisonnement du mode démonstration", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("refuse l API hors Grist sans paramètre demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { obtenirDocApiGrist } = await import("./grist-context.js");
+    expect(() => obtenirDocApiGrist()).toThrow(/document Grist/);
+  });
+
+  it("refuse un rôle prototype hors Grist sans demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "?role=RECRUTEUR" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { chargerUtilisateurCourant } = await import("./grist-context.js");
+    await expect(chargerUtilisateurCourant()).rejects.toThrow(/document Grist/);
+  });
+
+  it("autorise le profil prototype uniquement avec demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "?demo=1&role=RECRUTEUR" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { chargerUtilisateurCourant } = await import("./grist-context.js");
+    await expect(chargerUtilisateurCourant()).resolves.toMatchObject({ role: "RECRUTEUR" });
+  });
+
+  it("neutralise explicitement l API avec demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "?demo=1&role=RECRUTEUR" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { obtenirDocApiGrist } = await import("./grist-context.js");
+    expect(obtenirDocApiGrist()).toBeNull();
   });
 });

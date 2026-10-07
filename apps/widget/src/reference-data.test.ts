@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { construireDonneesReferentiel, validerAxe, validerCampagne, validerCritere, validerIndicateur } from "./reference-data.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { chargerDonneesReferentiel, construireDonneesReferentiel, validerAxe, validerCampagne, validerCritere, validerIndicateur } from "./reference-data.js";
 
 function donnees() {
   return construireDonneesReferentiel(
@@ -14,6 +14,20 @@ function donnees() {
 }
 
 describe("données du module Référentiel", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("expose les 13 indicateurs avec les trois niveaux en démonstration", async () => {
+    const stockage=new Map<string,string>();
+    vi.stubGlobal("sessionStorage",{getItem:(k:string)=>stockage.get(k)??null,setItem:(k:string,v:string)=>stockage.set(k,v),removeItem:(k:string)=>stockage.delete(k),clear:()=>stockage.clear()});
+    vi.stubGlobal("window",{parent:null,location:{search:"?demo=1&role=ADMIN"}});
+    (window as unknown as {parent:unknown}).parent=window;
+    const resultat = await chargerDonneesReferentiel();
+    expect(resultat.indicateurs).toHaveLength(13);
+    for (const indicateur of resultat.indicateurs) {
+      const niveaux = new Set(resultat.criteres.filter((critere) => critere.indicateurId === indicateur.id && critere.actif).map((critere) => critere.niveau));
+      expect(niveaux, indicateur.code).toEqual(new Set(["ROUGE", "ORANGE", "VERT"]));
+    }
+  });
+
   it("résout les relations et compte les usages", () => {
     const resultat = donnees();
     expect(resultat.axes[0]).toMatchObject({ indicateurs: 1 });

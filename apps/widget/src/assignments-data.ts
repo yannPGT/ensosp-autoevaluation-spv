@@ -59,7 +59,7 @@ export async function chargerDonneesAffectations(): Promise<DonneesAffectations>
 export async function creerAffectation(saisie: NouvelleAffectation, donnees: DonneesAffectations, acteurId: number): Promise<void> {
   validerNouvelleAffectation(saisie, donnees);
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { creerAffectationDemo(saisie); return; }
   const ids = perimetresActifsDuSuperviseur(saisie.superviseurId, donnees, saisie.perimetreId);
   await docApi.applyUserActions([
     ["AddRecord", "AffectationsSuperviseurs", null, {
@@ -74,7 +74,7 @@ export async function creerAffectation(saisie: NouvelleAffectation, donnees: Don
 export async function cloturerAffectation(affectationId: number, dateFin: string, donnees: DonneesAffectations, acteurId: number): Promise<void> {
   const affectation = validerCloture(affectationId, dateFin, donnees);
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { cloturerAffectationDemo(affectationId,dateFin); return; }
   const idsRestants = perimetresActifsDuSuperviseur(affectation.superviseurId, donnees, undefined, affectation.id);
   await docApi.applyUserActions([
     ["UpdateRecord", "AffectationsSuperviseurs", affectation.id, { DateFin: dateVersTimestamp(dateFin), Actif: false }],
@@ -87,7 +87,7 @@ export async function synchroniserSuperviseur(superviseurId: number, donnees: Do
   const superviseur = donnees.superviseurs.find((element) => element.id === superviseurId);
   if (!superviseur) throw new Error("Le superviseur est introuvable.");
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("La synchronisation est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { synchroniserSuperviseurDemo(superviseurId,donnees); return; }
   const ids = perimetresActifsDuSuperviseur(superviseurId, donnees);
   await docApi.applyUserActions([["UpdateRecord", "Utilisateurs", superviseurId, { PerimetresSupervises: ["L", ...ids] }], ["AddRecord", "JournalAudit", null, { Uid: crypto.randomUUID(), Acteur: acteurId, Perimetre: null, TypeObjet: "AFFECTATION", ObjetUid: String(superviseurId), Action: "SYNCHRONISATION_AFFECTATIONS", Resume: `Affectations synchronisées pour ${superviseur.nom}` }]]);
 }
@@ -185,14 +185,27 @@ function perimetresActifsDuSuperviseur(superviseurId: number, donnees: DonneesAf
   return idsUniques(ids);
 }
 
+const CLE_DEMO_AFFECTATIONS="spv-demo-admin-affectations-v1";
+type AffectationDemo={id:number;superviseurId:number;perimetreId:number;dateDebut:number;dateFin:number|null;actif:boolean};
+function affectationsDemoInitiales():AffectationDemo[]{return [
+  {id:20,superviseurId:2,perimetreId:2,dateDebut:1_700_006_400,dateFin:null,actif:true},
+];}
+function lireAffectationsDemo():AffectationDemo[]{try{const b=sessionStorage.getItem(CLE_DEMO_AFFECTATIONS);if(b)return JSON.parse(b) as AffectationDemo[];}catch{}return affectationsDemoInitiales();}
+function ecrireAffectationsDemo(v:AffectationDemo[]){try{sessionStorage.setItem(CLE_DEMO_AFFECTATIONS,JSON.stringify(v));}catch{}}
+function creerAffectationDemo(s:NouvelleAffectation){const v=lireAffectationsDemo();const prochain=Math.max(99,...v.map(a=>a.id))+1;v.push({id:prochain,superviseurId:s.superviseurId,perimetreId:s.perimetreId,dateDebut:dateVersTimestamp(s.dateDebut)!,dateFin:null,actif:true});ecrireAffectationsDemo(v);}
+function cloturerAffectationDemo(id:number,dateFin:string){const v=lireAffectationsDemo();const a=v.find(x=>x.id===id);if(!a)throw new Error("Cette affectation est introuvable.");a.dateFin=dateVersTimestamp(dateFin);a.actif=false;ecrireAffectationsDemo(v);}
+function synchroniserSuperviseurDemo(_id:number,_d:DonneesAffectations){/* La vue est reconstruite depuis les affectations locales actives. */}
 function donneesDemonstration(): DonneesAffectations {
+  const affectations=lireAffectationsDemo();
+  const perimetresParSuperviseur=(id:number)=>["L",...idsUniques(affectations.filter(a=>a.superviseurId===id&&a.actif).map(a=>a.perimetreId))];
   return construireDonneesAffectations({
-    id: [2, 3], Prenom: ["Camille", "Nora"], Nom: ["BERNARD", "DUPONT"], Email: ["camille@example.invalid", "nora@example.invalid"],
-    Role: ["SUPERVISEUR", "SUPERVISEUR"], Actif: [true, true], PerimetresSupervises: [["L", 11], ["L", 12]],
+    id: [2], Prenom: ["Camille"], Nom: ["BERNARD"], Email: ["camille.bernard@example.invalid"],
+    Role: ["SUPERVISEUR"], Actif: [true], PerimetresSupervises: [perimetresParSuperviseur(2)],
   }, {
-    id: [11, 12], Code: ["PER_33_NORD", "PER_33_SUD"], Nom: ["Groupement Nord", "Groupement Sud"], Entite: [1, 1], Actif: [true, true],
-  }, { id: [1], Code: ["SIS_33"], Nom: ["SDIS de la Gironde"] }, {
-    id: [20, 21], Superviseur: [2, 3], Perimetre: [11, 11], DateDebut: [1_700_006_400, 1_650_067_200], DateFin: [null, 1_680_048_000], Actif: [true, false],
+    id: [1, 2], Code: ["PER_NATIONAL", "PER_33_NORD"], Nom: ["Périmètre national", "SDIS 33 groupement NORD"], Entite: [1, 2], Actif: [true, true],
+  }, { id: [1,2], Code: ["ENSOSPP","SIS_33"], Nom: ["ENSOSPP","SDIS de la Gironde"] }, {
+    id: affectations.map(a=>a.id), Superviseur: affectations.map(a=>a.superviseurId), Perimetre: affectations.map(a=>a.perimetreId),
+    DateDebut: affectations.map(a=>a.dateDebut), DateFin: affectations.map(a=>a.dateFin), Actif: affectations.map(a=>a.actif),
   });
 }
 

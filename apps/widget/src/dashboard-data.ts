@@ -55,7 +55,7 @@ const STATUTS_ACTION_FERMEE = new Set(["PROGRESSION_VALIDEE", "ARCHIVEE"]);
 
 export async function chargerTableauDeBord(utilisateur: UtilisateurCourant): Promise<TableauDeBord> {
   const docApi = obtenirDocApiGrist();
-  if (!docApi) return construireTableauDeBord(utilisateur, tablesVides());
+  if (!docApi) return construireTableauDeBord(utilisateur, tablesDemonstration());
 
   const nomsTables = tablesPourRole(utilisateur.role);
   const valeurs = await Promise.all(nomsTables.map((nom) => docApi.fetchTable(nom)));
@@ -259,6 +259,24 @@ function construirePersonnel(
     })
     .filter((personne): personne is PersonnelTableauDeBord => personne !== null)
     .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+}
+
+function tablesDemonstration(): Record<string, TableGrist> {
+  const t:Record<string,TableGrist>={
+    Utilisateurs:{id:[2,3,4],Prenom:["Camille","Morgan","Sam"],Nom:["BERNARD","ROBERT","DURAND"],Email:["camille@example.invalid","morgan@example.invalid","sam@example.invalid"],Role:["SUPERVISEUR","RECRUTEUR","RECRUTEUR"],PerimetrePrincipal:[1,1,1],Actif:[true,true,true]},
+    Perimetres:{id:[1],Code:["SDIS33-N"],Nom:["SDIS 33 groupement NORD"],Actif:[true]},
+    Axes:{id:[1,2,3],Titre:["Processus et réactivité du chef de centre","Adéquation entre les attentes du SIS et du candidat","Intégration et fidélisation"]},
+    Indicateurs:{id:[1,2,3,4,5,6,7,8,9,10,11,12,13],Code:["IND_01","IND_02","IND_03","IND_04","IND_05","IND_06","IND_07","IND_08","IND_09","IND_10","IND_11","IND_12","IND_13"],Titre:["Délai du premier contact","Qualité du premier accueil","Délai entre premier contact et décision","Communication sur les valeurs et engagements du SIS","Exploration des motivations (Pourquoi / Pour quoi)","Vérification de la disponibilité réelle","Adéquation aux valeurs SPV (avec mini-cas)","Évaluation de la compatibilité à 360 degrés (Ikigaï)","Transparence sur la réalité du métier","Présentation du parcours de formation (FISPV)","Implication du tuteur ou référent","Suivi post-engagement (première année)","Indicateurs de résultat (retour sur investissement)"],Axe:[1,1,1,1,2,2,2,2,2,3,3,3,3],Actif:[true,true,true,true,true,true,true,true,true,true,true,true,true]},
+    Evaluations:{id:[1],Recruteur:[3],Perimetre:[1],Statut:["VALIDEE"],ProgressionComplete:[100],DateValidation:[Math.floor(Date.now()/1000)-86400]},
+    Reponses:{id:[1,2],Evaluation:[1,1],Recruteur:[3,3],Indicateur:[1,2],Niveau:["ROUGE","ORANGE"]},
+    ActionsProgres:{id:[1,2],Recruteur:[3,3],Perimetre:[1,1],Indicateur:[1,2],NiveauInitial:["ROUGE","ORANGE"],NiveauCourant:["ROUGE","ORANGE"],Statut:["EN_ATTENTE_VALIDATION","EN_COURS"],Echeance:[Math.floor(Date.now()/1000)+604800,Math.floor(Date.now()/1000)-86400],FicheVersion:[1,null]},
+    FichesEnseignement:{id:[1],Code:["FICHE_IND_01"],Titre:["Réussir le premier contact"],Actif:[true]}
+  };
+  try{
+    const e=sessionStorage.getItem("spv-demo-evaluation-v1"); if(e){const d=JSON.parse(e) as {evaluationId:number|null;reponses:Record<string,string>;statut:string|null};if(d.evaluationId&&d.statut==="VALIDEE"){const codes=Object.keys(d.reponses);const ids=new Map([["IND_01",1],["IND_02",2],["IND_03",3],["IND_04",4],["IND_05",5],["IND_06",6],["IND_07",7],["IND_08",8],["IND_09",9],["IND_10",10],["IND_11",11],["IND_12",12],["IND_13",13]]);t.Evaluations={id:[d.evaluationId],Recruteur:[3],Perimetre:[1],Statut:["VALIDEE"],ProgressionComplete:[100],DateValidation:[Math.floor(Date.now()/1000)]};t.Reponses={id:codes.map((_,i)=>9000+i),Evaluation:codes.map(()=>d.evaluationId),Recruteur:codes.map(()=>3),Indicateur:codes.map(c=>ids.get(c)??0),Niveau:codes.map(c=>d.reponses[c])};}}
+    const a=sessionStorage.getItem("spv-demo-actions-v1"); if(a)t.ActionsProgres=JSON.parse(a) as TableGrist;
+  }catch{}
+  return t;
 }
 
 function tablesVides(): Record<string, TableGrist> {

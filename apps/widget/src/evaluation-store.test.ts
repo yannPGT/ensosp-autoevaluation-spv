@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { enregistrerReponse, ficheDeclenchee, validerEvaluation } from "./evaluation-store.js";
+import { creerEvaluation, enregistrerReponse, ficheDeclenchee, validerEvaluation } from "./evaluation-store.js";
 import { DocApiGrist, TableGrist } from "./grist-context.js";
 
 const tables: Record<string, TableGrist> = {
@@ -180,5 +180,29 @@ describe("validerEvaluation", () => {
     expect(lots[0]?.[0]?.[1]).toBe("ActionsProgres");
     expect(lots[0]?.[0]?.[3]).toMatchObject({ Evaluation: 10, FeuilleRoute: 40, Reponse: 102 });
     expect(lots[0]?.some((action) => action[1] === "Evaluations")).toBe(false);
+  });
+});
+
+
+describe("cycles d’évaluation du mode démonstration", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("attribue un identifiant distinct après archivage d’une première évaluation", async () => {
+    const stockage=new Map<string,string>([
+      ["spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,statut:"VALIDEE",reponses:{IND_01:"ROUGE"}}])],
+    ]);
+    vi.stubGlobal("sessionStorage",{
+      getItem:(k:string)=>stockage.get(k)??null,
+      setItem:(k:string,v:string)=>{stockage.set(k,v);},
+      removeItem:(k:string)=>{stockage.delete(k);},
+      clear:()=>stockage.clear(),
+    });
+    vi.stubGlobal("window",{parent:null,location:{search:"?demo=1&role=RECRUTEUR"}});
+    (window as unknown as {parent:unknown}).parent=window;
+
+    const id=await creerEvaluation(recruteur);
+
+    expect(id).toBe(9002);
+    expect(JSON.parse(stockage.get("spv-demo-evaluation-v1")??"{}")).toMatchObject({evaluationId:9002,statut:"BROUILLON"});
   });
 });

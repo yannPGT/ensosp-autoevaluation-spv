@@ -23,7 +23,7 @@ const TABLE_CONTEXTE = "ContexteWidget";
 
 export async function chargerUtilisateurCourant(): Promise<UtilisateurCourant> {
   if (window.parent === window) {
-    if (new URLSearchParams(window.location.search).has("role")) return utilisateurPrototype();
+    if (estModeDemonstration() && new URLSearchParams(window.location.search).has("role")) return utilisateurPrototype();
     throw new Error("Ce widget doit être ouvert depuis votre document Grist.");
   }
   const grist = window.grist;
@@ -102,8 +102,14 @@ export function construireUtilisateur(
   };
 }
 
+export function estModeDemonstration(): boolean {
+  if (typeof window === "undefined" || !window.location) return false;
+  return new URLSearchParams(window.location.search ?? "").get("demo") === "1";
+}
+
 export function obtenirDocApiGrist(): DocApiGrist | null {
-  if (window.parent === window) return null;
+  if (estModeDemonstration()) return null;
+  if (window.parent === window) throw new Error("Ce widget doit être ouvert depuis votre document Grist.");
   return window.grist?.docApi ?? null;
 }
 

@@ -59,7 +59,7 @@ export async function chargerDonneesUtilisateurs(): Promise<DonneesUtilisateurs>
 
 export async function enregistrerUtilisateur(saisie: SaisieUtilisateur, acteur: Pick<UtilisateurCourant, "id" | "email">): Promise<void> {
   const docApi = obtenirDocApiGrist();
-  if (!docApi) throw new Error("L’enregistrement est disponible uniquement depuis le widget Grist.");
+  if (!docApi) { preparerChampsUtilisateur(saisie); enregistrerUtilisateurDemo(saisie); return; }
   const champs = preparerChampsUtilisateur(saisie);
   const action = saisie.id
     ? ["UpdateRecord", "Utilisateurs", saisie.id, champs]
@@ -167,15 +167,26 @@ function construireReferences(table: TableGrist, avecEntite = false): ReferenceA
   return references.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 }
 
+const CLE_DEMO_UTILISATEURS="spv-demo-admin-utilisateurs-v1";
+let utilisateursDemo:SaisieUtilisateur[]=[];
+function chargerUtilisateursDemo():void{try{const b=sessionStorage.getItem(CLE_DEMO_UTILISATEURS);utilisateursDemo=b?JSON.parse(b) as SaisieUtilisateur[]:[];}catch{utilisateursDemo=[];}}
+function enregistrerUtilisateurDemo(s:SaisieUtilisateur):void{chargerUtilisateursDemo();const id=s.id??Math.max(99,...utilisateursDemo.map(x=>x.id??0))+1;utilisateursDemo=utilisateursDemo.filter(x=>x.id!==id).concat({...s,id});try{sessionStorage.setItem(CLE_DEMO_UTILISATEURS,JSON.stringify(utilisateursDemo));}catch{}}
 function donneesDemonstration(): DonneesUtilisateurs {
-  const entites: ReferenceAdministration[] = [{ id: 1, code: "ENSOSPP", nom: "ENSOSPP", actif: true }];
-  const perimetres: ReferenceAdministration[] = [{ id: 1, code: "NATIONAL", nom: "Périmètre national", entiteId: 1, actif: true }];
+  const entites: ReferenceAdministration[] = [{ id: 1, code: "ENSOSPP", nom: "ENSOSPP", actif: true }, { id: 2, code: "SDIS33", nom: "SDIS de la Gironde", actif: true }];
+  const perimetres: ReferenceAdministration[] = [{ id: 1, code: "NATIONAL", nom: "Périmètre national", entiteId: 1, actif: true }, { id: 2, code: "SDIS33-NORD", nom: "SDIS 33 groupement NORD", entiteId: 2, actif: true }];
+  chargerUtilisateursDemo();
+  const base:SaisieUtilisateur[]=[
+    {id:1,actifInitial:true,email:"alex.martin@example.invalid",nom:"MARTIN",prenom:"Alex",role:"ADMIN",peutGererPedagogie:true,entiteId:1,perimetrePrincipalId:1,actif:true},
+    {id:2,actifInitial:true,email:"camille.bernard@example.invalid",nom:"BERNARD",prenom:"Camille",role:"SUPERVISEUR",peutGererPedagogie:false,entiteId:2,perimetrePrincipalId:2,actif:true},
+    {id:3,actifInitial:true,email:"morgan.robert@example.invalid",nom:"ROBERT",prenom:"Morgan",role:"RECRUTEUR",peutGererPedagogie:false,entiteId:2,perimetrePrincipalId:2,actif:true},
+  ];
+  const remplacements=new Map(utilisateursDemo.filter(x=>x.id&&x.id<=3).map(x=>[x.id!,x]));
+  const utilisateurs=base.map(x=>remplacements.get(x.id!)??x).concat(utilisateursDemo.filter(x=>(x.id??0)>3));
   return construireDonneesUtilisateurs({
-    id: [1, 2, 3], Email: ["alex@example.invalid", "camille@example.invalid", "morgan@example.invalid"],
-    Nom: ["MARTIN", "BERNARD", "ROBERT"], Prenom: ["Alex", "Camille", "Morgan"],
-    Role: ["ADMIN", "SUPERVISEUR", "RECRUTEUR"], PeutGererPedagogie: [true, false, false],
-    Entite: [1, 1, 1], PerimetrePrincipal: [1, 1, 1], PerimetresSupervises: [["L"], ["L", 1], ["L"]],
-    Actif: [true, true, false], DateActivation: [1_700_006_400, 1_700_006_400, 1_700_006_400], DateDesactivation: [null, null, 1_730_000_000],
+    id: utilisateurs.map(x=>x.id!), Email: utilisateurs.map(x=>x.email), Nom: utilisateurs.map(x=>x.nom), Prenom: utilisateurs.map(x=>x.prenom),
+    Role: utilisateurs.map(x=>x.role), PeutGererPedagogie: utilisateurs.map(x=>x.role==="ADMIN"),
+    Entite: utilisateurs.map(x=>x.entiteId), PerimetrePrincipal: utilisateurs.map(x=>x.perimetrePrincipalId), PerimetresSupervises: utilisateurs.map(x=>x.role==="SUPERVISEUR"?["L",2]:["L"]),
+    Actif: utilisateurs.map(x=>x.actif), DateActivation: utilisateurs.map(x=>x.actif?1_700_006_400:null), DateDesactivation: utilisateurs.map(x=>x.actif?null:1_730_000_000),
   }, referencesVersTable(entites), referencesVersTable(perimetres, true));
 }
 

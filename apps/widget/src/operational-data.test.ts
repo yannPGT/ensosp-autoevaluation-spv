@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chargerDonneesOperationnelles, construireDonneesOperationnelles, deciderAction, declarerProgression, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante, rouvrirAction } from "./operational-data.js";
+import { chargerDonneesOperationnelles, construireDonneesOperationnelles, debloquerEvaluationRecruteur, deciderAction, declarerProgression, definirEcheance, journaliserConsultation, peutConsulterFiches, rattacherFicheManquante, rouvrirAction } from "./operational-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
 
 const utilisateur:UtilisateurCourant={id:3,prenom:"Morgan",nom:"ROBERT",email:"m@x",role:"RECRUTEUR",entite:"SDIS",perimetrePrincipal:"Nord",perimetresSupervises:[],superviseurNom:"Camille",peutGererPedagogie:false,actif:true};
@@ -210,5 +210,180 @@ describe("données recruteur et superviseur", () => {
 
     await expect(rattacherFicheManquante(30,40,superviseur)).rejects.toThrow("ne peut pas être remplacée");
     expect(applyUserActions).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("cycle démonstration Recruteur vers Superviseur", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  function installerDemo(role:"RECRUTEUR"|"SUPERVISEUR") {
+    const stockage=new Map<string,string>();
+    vi.stubGlobal("sessionStorage",{
+      getItem:(k:string)=>stockage.get(k)??null,
+      setItem:(k:string,v:string)=>{stockage.set(k,v);},
+      removeItem:(k:string)=>{stockage.delete(k);},
+      clear:()=>stockage.clear(),
+    });
+    vi.stubGlobal("window",{parent:null,location:{search:`?demo=1&role=${role}`}});
+    (window as unknown as {parent:unknown}).parent=window;
+    return stockage;
+  }
+
+  it("conserve une évaluation validée dans l historique lors du déblocage", async () => {
+    const stockage=installerDemo("SUPERVISEUR");
+    stockage.set("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"VERT"},statut:"VALIDEE",verrouillee:true}));
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+
+    await debloquerEvaluationRecruteur(3,superviseur);
+
+    expect(stockage.has("spv-demo-evaluation-v1")).toBe(false);
+    const historique=JSON.parse(stockage.get("spv-demo-historique-v1")??"[]");
+    expect(historique).toHaveLength(1);
+    expect(historique[0]).toMatchObject({evaluationId:9001,statut:"VALIDEE",reponses:{IND_01:"ROUGE",IND_02:"VERT"}});
+  });
+
+  it("persiste la décision du superviseur et le passage au vert", async () => {
+    const stockage=installerDemo("SUPERVISEUR");
+    const action={id:30,uid:"ACT-30",recruteurId:3,recruteur:"Morgan ROBERT",perimetreId:1,perimetre:"Nord",indicateur:"Premier contact",codeIndicateur:"IND_01",niveauInitial:"ROUGE",niveauCourant:"ROUGE",statut:"EN_ATTENTE_VALIDATION",echeance:"",echeanceTimestamp:0,commentaireRecruteur:"",commentaireSuperviseur:"",priseEnCompteFiche:false,ficheVersionId:null,fiche:"—",version:"",nomFichier:"",attachmentId:null} as const;
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+
+    await deciderAction(action,"VALIDEE","VERT","",superviseur);
+
+    const validations=JSON.parse(stockage.get("spv-demo-validations-v1")??"[]");
+    expect(validations).toHaveLength(1);
+    expect(validations[0]).toMatchObject({ActionProgres:30,Decision:"VALIDEE",AncienNiveau:"ROUGE",NouveauNiveau:"VERT",Superviseur:2});
+  });
+});
+
+
+describe("règles métier du mode démonstration", () => {
+  afterEach(() => {
+    try { sessionStorage.clear(); } catch {}
+    vi.unstubAllGlobals();
+  });
+
+  function installerModeDemo() {
+    const stockage=new Map<string,string>();
+    vi.stubGlobal("sessionStorage",{
+      getItem:(k:string)=>stockage.get(k)??null,
+      setItem:(k:string,v:string)=>{stockage.set(k,v);},
+      removeItem:(k:string)=>{stockage.delete(k);},
+      clear:()=>stockage.clear(),
+    });
+    vi.stubGlobal("window",{parent:null,location:{search:"?demo=1&role=RECRUTEUR"}});
+    (window as unknown as {parent:unknown}).parent=window;
+  }
+
+  it("exige la prise en compte de la fiche avant déclaration de progression", async () => {
+    installerModeDemo();
+    const action={id:1,ficheVersionId:1,perimetreId:1} as Parameters<typeof declarerProgression>[0];
+    await expect(declarerProgression(action,"",utilisateur,false)).rejects.toThrow(/prise en compte/);
+  });
+
+  it("rattache une fiche publiée à une action en démonstration", async () => {
+    installerModeDemo();
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+    await rattacherFicheManquante(2,1,superviseur);
+    const donnees=await chargerDonneesOperationnelles("progression",superviseur);
+    expect(donnees.actions.find(a=>a.id===2)?.ficheVersionId).toBe(1);
+  });
+
+  it("interdit au recruteur de rattacher une fiche en démonstration", async () => {
+    installerModeDemo();
+    await expect(rattacherFicheManquante(2,1,utilisateur)).rejects.toThrow(/superviseur|administrateur/i);
+  });
+
+  it("interdit au recruteur de définir une échéance même en démonstration", async () => {
+    installerModeDemo();
+    const action={id:1,perimetreId:1} as Parameters<typeof definirEcheance>[0];
+    await expect(definirEcheance(action,"2026-12-01",utilisateur)).rejects.toThrow(/superviseur|administrateur/i);
+  });
+
+  it("conserve le cycle complément puis nouvelle soumission en démonstration", async () => {
+    installerModeDemo();
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+    let donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    let action=donnees.actions.find(a=>a.id===1)!;
+    await deciderAction(action,"COMPLEMENT_DEMANDE",null,"Merci de préciser la procédure appliquée",superviseur);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    action=donnees.actions.find(a=>a.id===1)!;
+    expect(action).toMatchObject({statut:"COMPLEMENT_DEMANDE",commentaireSuperviseur:"Merci de préciser la procédure appliquée"});
+    await declarerProgression(action,"Procédure complétée",utilisateur,true);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    expect(donnees.actions.find(a=>a.id===1)).toMatchObject({statut:"EN_ATTENTE_VALIDATION",commentaireRecruteur:"Procédure complétée"});
+  });
+
+  it("conserve le cycle refus puis réouverture puis nouvelle soumission en démonstration", async () => {
+    installerModeDemo();
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+    let donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    let action=donnees.actions.find(a=>a.id===1)!;
+    await deciderAction(action,"REFUSEE",null,"Éléments insuffisants",superviseur);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    action=donnees.actions.find(a=>a.id===1)!;
+    expect(action.statut).toBe("VALIDATION_REFUSEE");
+    await rouvrirAction(action,superviseur);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    action=donnees.actions.find(a=>a.id===1)!;
+    expect(action.statut).toBe("EN_COURS");
+    await declarerProgression(action,"Correction effectuée",utilisateur,true);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    expect(donnees.actions.find(a=>a.id===1)).toMatchObject({statut:"EN_ATTENTE_VALIDATION",commentaireRecruteur:"Correction effectuée"});
+  });
+
+  it("conserve le cycle 9001 archivé lorsque le cycle 9002 est validé", async () => {
+    installerModeDemo();
+    const stockage=sessionStorage as unknown as {getItem:(k:string)=>string|null,setItem:(k:string,v:string)=>void};
+    stockage.setItem("spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"VERT"},statut:"VALIDEE",archiveeLe:1750000000}]));
+    stockage.setItem("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9002,reponses:{IND_01:"VERT",IND_02:"ORANGE"},statut:"VALIDEE",verrouillee:true}));
+
+    const donnees=await chargerDonneesOperationnelles("historique",utilisateur);
+
+    const ids=donnees.evaluations.map(e=>e.id);
+    expect(ids).toContain(9001);
+    expect(ids).toContain(9002);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("génère les résultats et actions pour les indicateurs au-delà de IND_02", async () => {
+    installerModeDemo();
+    const stockage=sessionStorage as unknown as {setItem:(k:string,v:string)=>void};
+    stockage.setItem("spv-demo-evaluation-v1",JSON.stringify({
+      evaluationId:9003,
+      reponses:{IND_03:"ROUGE",IND_07:"ORANGE",IND_13:"VERT"},
+      statut:"VALIDEE",
+      verrouillee:true,
+    }));
+
+    const donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+
+    const evaluation=donnees.evaluations.find(e=>e.id===9003);
+    expect(evaluation).toBeDefined();
+    const codesActions=donnees.actions.filter(a=>a.recruteurId===utilisateur.id).map(a=>a.codeIndicateur);
+    expect(codesActions).toEqual(expect.arrayContaining(["IND_03","IND_07"]));
+    expect(codesActions).not.toContain("IND_13");
+  });
+
+  it("attribue des identifiants de réponses distincts à deux cycles d'évaluation", async () => {
+    installerModeDemo();
+    sessionStorage.setItem("spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,reponses:{IND_01:"ROUGE"},statut:"VALIDEE",archiveeLe:1_730_000_000}]));
+    sessionStorage.setItem("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9002,reponses:{IND_01:"ORANGE"},statut:"VALIDEE",verrouillee:true}));
+    const donnees=await chargerDonneesOperationnelles("historique",utilisateur);
+    const ids=donnees.evaluations.filter(e=>[9001,9002].includes(e.id)).map(e=>e.id);
+    expect(ids).toEqual(expect.arrayContaining([9001,9002]));
+    const actions=donnees.actions;
+    expect(new Set(actions.map(a=>a.id)).size).toBe(actions.length);
+  });
+  it("ne conserve aucun doublon d'identifiant de réponse entre historique et cycle courant", async () => {
+    installerModeDemo();
+    sessionStorage.setItem("spv-demo-historique-v1",JSON.stringify([{evaluationId:9001,reponses:{IND_01:"ROUGE",IND_02:"ORANGE"},statut:"VALIDEE",archiveeLe:1_730_000_000}]));
+    sessionStorage.setItem("spv-demo-evaluation-v1",JSON.stringify({evaluationId:9002,reponses:{IND_01:"ORANGE",IND_03:"ROUGE"},statut:"VALIDEE",verrouillee:true}));
+    const donnees=await chargerDonneesOperationnelles("historique",utilisateur);
+    expect(donnees.evaluations.filter(e=>[9001,9002].includes(e.id))).toHaveLength(2);
+    expect(donnees.actions.every(a=>a.recruteurId===utilisateur.id)).toBe(true);
   });
 });

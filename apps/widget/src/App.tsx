@@ -20,6 +20,7 @@ import {
   libellesRoles,
   menuPour,
   UtilisateurCourant,
+  utilisateurPrototype,
 } from "./portal-data.js";
 
 type EtapeEvaluation = "QUESTIONNAIRE" | "FINALISEE" | "BILAN";
@@ -42,6 +43,7 @@ export function App() {
     { statut: "erreur"; message: string }
   >({ statut: "chargement" });
   const [tentativeConnexion, setTentativeConnexion] = useState(0);
+  const modeDemo = new URLSearchParams(window.location.search).get("demo") === "1";
   const [tentativeTableau, setTentativeTableau] = useState(0);
   const [etatTableau, setEtatTableau] = useState<EtatTableauDeBord>({ statut: "chargement" });
   const [pageActive, setPageActive] = useState("accueil");
@@ -62,14 +64,14 @@ export function App() {
   useEffect(() => {
     let actif = true;
     setEtatUtilisateur({ statut: "chargement" });
-    chargerUtilisateurCourant()
+    (modeDemo ? Promise.resolve(utilisateurPrototype()) : chargerUtilisateurCourant())
       .then((profil) => { if (actif) setEtatUtilisateur({ statut: "pret", utilisateur: profil }); })
       .catch((erreur: unknown) => {
         const message = erreur instanceof Error ? erreur.message : "Une erreur inconnue empêche l’identification.";
         if (actif) setEtatUtilisateur({ statut: "erreur", message });
       });
     return () => { actif = false; };
-  }, [tentativeConnexion]);
+  }, [tentativeConnexion, modeDemo]);
 
   useEffect(() => {
     if (!utilisateur) return;
@@ -94,7 +96,8 @@ export function App() {
 
   return (
     <main>
-      <Bandeau utilisateur={utilisateur} nomApplication={nom} />
+      <Bandeau utilisateur={utilisateur} nomApplication={nom} modeDemo={modeDemo} />
+      {modeDemo && <BandeauDemonstration utilisateur={utilisateur} />}
       <div className="application-shell">
         <MenuNavigation menu={menu} pageActive={pageActive} changerPage={setPageActive} />
         <div className="contenu-application">
@@ -159,7 +162,7 @@ function EcranConnexion({ titre, message, reessayer }: { titre: string; message:
   );
 }
 
-function Bandeau({ utilisateur, nomApplication }: { utilisateur: UtilisateurCourant; nomApplication: string }) {
+function Bandeau({ utilisateur, nomApplication, modeDemo = false }: { utilisateur: UtilisateurCourant; nomApplication: string; modeDemo?: boolean }) {
   return (
     <header>
       <span className="badge-beta">Bêta</span>
@@ -170,10 +173,25 @@ function Bandeau({ utilisateur, nomApplication }: { utilisateur: UtilisateurCour
         <span>{utilisateur.perimetrePrincipal}</span>
         {utilisateur.role === "RECRUTEUR" && <span>Superviseur : {utilisateur.superviseurNom}</span>}
       </div>
-      <p>Questionnaire administrable · vos données restent protégées par Grist</p>
+      <p>{modeDemo ? "Mode démonstration · données fictives locales · aucune connexion à Grist" : "Questionnaire administrable · vos données restent protégées par Grist"}</p>
       <p className="version-widget">Version 1.0 · © YannPGT</p>
     </header>
   );
+}
+
+function BandeauDemonstration({ utilisateur }: { utilisateur: UtilisateurCourant }) {
+  const changerRole = (role: "ADMIN" | "SUPERVISEUR" | "RECRUTEUR") => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("demo", "1");
+    url.searchParams.set("role", role);
+    window.location.href = url.toString();
+  };
+  return <section className="bandeau-demonstration" aria-label="Mode démonstration">
+    <div><strong>MODE DÉMONSTRATION · DONNÉES FICTIVES</strong><span>Aucun accès à Grist ou ProConnect. Les actions sont simulées dans le navigateur.</span></div>
+    <div className="profils-demonstration">
+      {(["RECRUTEUR","SUPERVISEUR","ADMIN"] as const).map((role) => <button type="button" className={utilisateur.role === role ? "profil-demo-actif" : ""} onClick={() => changerRole(role)} key={role}>{libellesRoles[role]}</button>)}
+    </div>
+  </section>;
 }
 
 function MenuNavigation({ menu, pageActive, changerPage }: {
@@ -441,6 +459,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   const [sessionChargee, setSessionChargee] = useState(false);
   const [avertissementFinalisation, setAvertissementFinalisation] = useState("");
   const [operationEvaluation, setOperationEvaluation] = useState(false);
+  const [indexIndicateur, setIndexIndicateur] = useState(0);
   const creationEnCours = useRef<Promise<number> | null>(null);
   const derniereSauvegarde = useRef<Promise<void>>(Promise.resolve());
 
@@ -458,7 +477,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
         setEtatSauvegarde("Dernière évaluation validée chargée");
       } else {
         setEtape("QUESTIONNAIRE");
-        setEtatSauvegarde(session.evaluationId ? "Brouillon Grist chargé" : "Le brouillon sera créé à la première réponse");
+        setEtatSauvegarde(session.evaluationId ? (new URLSearchParams(window.location.search).get("demo") === "1" ? "Brouillon de démonstration chargé" : "Brouillon Grist chargé") : "Le brouillon sera créé à la première réponse");
       }
     }).catch((erreur: unknown) => {
       if (actif) {
@@ -470,6 +489,14 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   }, [utilisateur, setReponses, setEtape]);
 
   const indicateurs = questionnaire ? indicateursQuestionnaire(questionnaire) : [];
+  const indicateurCourant = indicateurs[indexIndicateur];
+  const axeCourant = questionnaire?.axes.find((axe) => axe.indicateurs.some((indicateur) => indicateur.code === indicateurCourant?.code));
+
+  useEffect(() => {
+    if (!sessionChargee || !indicateurs.length) return;
+    const premierNonRenseigne = indicateurs.findIndex((indicateur) => !reponsesSauvegardees[indicateur.code]);
+    setIndexIndicateur(premierNonRenseigne >= 0 ? premierNonRenseigne : Math.max(0, indicateurs.length - 1));
+  }, [sessionChargee, questionnaire]);
 
   const reponsesNonEnregistrees = sessionChargee && Object.entries(reponses)
     .some(([code, niveau]) => reponsesSauvegardees[code] !== niveau);
@@ -484,8 +511,9 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     return () => window.removeEventListener("beforeunload", avertirSortie);
   }, [reponsesNonEnregistrees]);
 
+  const modeDemoEvaluation = new URLSearchParams(window.location.search).get("demo") === "1";
+  const libelleStockage = modeDemoEvaluation ? "dans cette session de démonstration" : "dans Grist";
   const assurerEvaluation = async () => {
-    if (window.parent === window) return -1;
     if (evaluationId) return evaluationId;
     if (!creationEnCours.current) creationEnCours.current = creerEvaluation(utilisateur);
     const id = await creationEnCours.current;
@@ -495,16 +523,16 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
 
   const choisirReponse = async (code: string, niveau: Niveau) => {
     setReponses((courantes) => ({ ...courantes, [code]: niveau }));
-    setEtatSauvegarde("Enregistrement dans Grist…");
+    setEtatSauvegarde(`Enregistrement ${libelleStockage}…`);
     setErreurSauvegarde("");
     setSauvegardesEnCours((nombre) => nombre + 1);
     derniereSauvegarde.current = derniereSauvegarde.current.catch(() => undefined).then(async () => {
       try {
         const id = await assurerEvaluation();
-        if (id !== -1) await enregistrerReponse(id, code, niveau);
+        await enregistrerReponse(id, code, niveau);
         setReponsesSauvegardees((courantes) => ({ ...courantes, [code]: niveau }));
         setErreurSauvegarde("");
-        setEtatSauvegarde("Brouillon enregistré dans Grist");
+        setEtatSauvegarde(`Brouillon enregistré ${libelleStockage}`);
       } finally {
         setSauvegardesEnCours((nombre) => Math.max(0, nombre - 1));
       }
@@ -516,7 +544,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     }
   };
 
-  if (!sessionChargee || !questionnaire) return <section className="page-carte"><p>Chargement du questionnaire depuis le référentiel Grist…</p></section>;
+  if (!sessionChargee || !questionnaire) return <section className="page-carte"><p>{modeDemoEvaluation ? "Chargement du questionnaire de démonstration…" : "Chargement du questionnaire depuis le référentiel Grist…"}</p></section>;
   if (etape === "BILAN") return <Bilan questionnaire={questionnaire} reponses={reponses} modifier={() => setEtape("FINALISEE")} />;
   if (etape === "FINALISEE") {
     const contact = utilisateur.superviseurNom && utilisateur.superviseurNom !== "Non renseigné"
@@ -549,16 +577,16 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
     if (!aSauvegarder.length) return;
     setOperationEvaluation(true);
     setSauvegardesEnCours(aSauvegarder.length);
-    setEtatSauvegarde("Nouvelle tentative d’enregistrement dans Grist…");
+    setEtatSauvegarde(`Nouvelle tentative d’enregistrement ${libelleStockage}…`);
     setErreurSauvegarde("");
     try {
       const id = await assurerEvaluation();
       for (const [code, niveau] of aSauvegarder) {
-        if (id !== -1) await enregistrerReponse(id, code, niveau);
+        await enregistrerReponse(id, code, niveau);
         setReponsesSauvegardees((courantes) => ({ ...courantes, [code]: niveau }));
         setSauvegardesEnCours((nombre) => Math.max(0, nombre - 1));
       }
-      setEtatSauvegarde("Brouillon enregistré dans Grist");
+      setEtatSauvegarde(`Brouillon enregistré ${libelleStockage}`);
     } catch (erreur) {
       setSauvegardesEnCours(0);
       setEtatSauvegarde("Non enregistré — vous pouvez réessayer sans ressaisir votre réponse.");
@@ -591,10 +619,8 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
       try {
         await derniereSauvegarde.current;
         const id = await assurerEvaluation();
-        if (id !== -1) {
-          const resultat = await validerEvaluation(id, utilisateur);
-          setAvertissementFinalisation(resultat.avertissement ?? "");
-        }
+        const resultat = await validerEvaluation(id, utilisateur);
+        setAvertissementFinalisation(resultat.avertissement ?? "");
         setEtatSauvegarde("Évaluation validée");
         setEtape("FINALISEE");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -616,30 +642,33 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
         <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateurs.length}<span>réponses enregistrées</span></p>
       </div>
       <form onSubmit={valider}>
-        {questionnaire.axes.map((axe, axeIndex) => (
-          <section className="axe" aria-labelledby={`titre-${axe.code}`} key={axe.code}>
-            <div className="axe-titre"><span>Axe {axeIndex + 1}</span><h3 id={`titre-${axe.code}`}>{axe.titre}</h3></div>
-            {axe.indicateurs.map((indicateur) => (
-              <fieldset key={indicateur.code}>
-                <legend>{indicateur.titre}</legend>
-                <div className="choix-niveaux">
-                  {indicateur.options.map((option) => (
-                    <label className={reponses[indicateur.code] === option.niveau ? "choix-niveau choix-selectionne" : "choix-niveau"} key={option.niveau}>
-                      <input type="radio" name={indicateur.code} value={option.niveau} checked={reponses[indicateur.code] === option.niveau} onChange={() => choisirReponse(indicateur.code, option.niveau)} />
-                      <span>{option.criteres.join(" · ")}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ))}
+        {indicateurCourant && axeCourant && (
+          <section className="axe questionnaire-etape" aria-labelledby={`titre-${axeCourant.code}`}>
+            <div className="axe-titre"><span>Indicateur {indexIndicateur + 1} sur {indicateurs.length}</span><h3 id={`titre-${axeCourant.code}`}>{axeCourant.titre}</h3></div>
+            <fieldset>
+              <legend>{indicateurCourant.titre}</legend>
+              <div className="choix-niveaux">
+                {indicateurCourant.options.map((option) => (
+                  <label className={reponses[indicateurCourant.code] === option.niveau ? "choix-niveau choix-selectionne" : "choix-niveau"} key={option.niveau}>
+                    <input type="radio" name={indicateurCourant.code} value={option.niveau} checked={reponses[indicateurCourant.code] === option.niveau} onChange={() => choisirReponse(indicateurCourant.code, option.niveau)} />
+                    <span>{option.criteres.join(" · ")}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="navigation-questionnaire">
+              <button type="button" className="bouton-secondaire" onClick={() => setIndexIndicateur((index) => Math.max(0, index - 1))} disabled={indexIndicateur === 0}>Précédent</button>
+              <span>{indexIndicateur + 1} / {indicateurs.length}</span>
+              <button type="button" onClick={() => setIndexIndicateur((index) => Math.min(indicateurs.length - 1, index + 1))} disabled={indexIndicateur === indicateurs.length - 1}>Suivant</button>
+            </div>
           </section>
-        ))}
+        )}
         <div className="actions-formulaire">
           <button type="button" className="bouton-secondaire" onClick={enregistrerBrouillon} disabled={operationEvaluation}>Enregistrer le brouillon</button>
           <button type="submit" disabled={!complet || operationEvaluation}>Valider mon auto-évaluation</button>
         </div>
         <p className="message-formulaire" aria-live="polite">
-          {sauvegardesEnCours > 0 ? "Enregistrement dans Grist…" : reponsesNonEnregistrees ? "Non enregistré — vous pouvez réessayer sans ressaisir votre réponse." : etatSauvegarde}
+          {sauvegardesEnCours > 0 ? `Enregistrement ${libelleStockage}…` : reponsesNonEnregistrees ? "Non enregistré — vous pouvez réessayer sans ressaisir votre réponse." : etatSauvegarde}
         </p>
         {erreurSauvegarde && <p className="message-formulaire message-erreur" role="alert">{erreurSauvegarde}</p>}
         {reponsesNonEnregistrees && sauvegardesEnCours === 0 && <div className="message-formulaire message-avertissement" role="status">

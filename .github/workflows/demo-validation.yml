@@ -1,0 +1,22 @@
+name: Demo validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-widget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm --filter @ensosp/widget build
+      - run: pnpm test -- apps/widget/src
