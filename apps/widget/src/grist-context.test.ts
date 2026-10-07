@@ -41,3 +41,22 @@ describe("construireUtilisateur", () => {
     }, entites, perimetres)).toThrow("n’est pas reconnu");
   });
 });
+
+
+describe("cloisonnement du mode démonstration", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("refuse l API hors Grist sans paramètre demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { obtenirDocApiGrist } = await import("./grist-context.js");
+    expect(() => obtenirDocApiGrist()).toThrow(/document Grist/);
+  });
+
+  it("neutralise explicitement l API avec demo=1", async () => {
+    vi.stubGlobal("window", { parent: null, location: { search: "?demo=1&role=RECRUTEUR" } });
+    (window as unknown as {parent:unknown}).parent = window;
+    const { obtenirDocApiGrist } = await import("./grist-context.js");
+    expect(obtenirDocApiGrist()).toBeNull();
+  });
+});
