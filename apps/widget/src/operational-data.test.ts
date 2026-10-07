@@ -303,6 +303,38 @@ describe("règles métier du mode démonstration", () => {
     await expect(definirEcheance(action,"2026-12-01",utilisateur)).rejects.toThrow(/superviseur|administrateur/i);
   });
 
+  it("conserve le cycle complément puis nouvelle soumission en démonstration", async () => {
+    installerModeDemo();
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+    let donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    let action=donnees.actions.find(a=>a.id===1)!;
+    await deciderAction(action,"COMPLEMENT_DEMANDE",null,"Merci de préciser la procédure appliquée",superviseur);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    action=donnees.actions.find(a=>a.id===1)!;
+    expect(action).toMatchObject({statut:"COMPLEMENT_DEMANDE",commentaireSuperviseur:"Merci de préciser la procédure appliquée"});
+    await declarerProgression(action,"Procédure complétée",utilisateur,true);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    expect(donnees.actions.find(a=>a.id===1)).toMatchObject({statut:"EN_ATTENTE_VALIDATION",commentaireRecruteur:"Procédure complétée"});
+  });
+
+  it("conserve le cycle refus puis réouverture puis nouvelle soumission en démonstration", async () => {
+    installerModeDemo();
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+    let donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    let action=donnees.actions.find(a=>a.id===1)!;
+    await deciderAction(action,"REFUSEE",null,"Éléments insuffisants",superviseur);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    action=donnees.actions.find(a=>a.id===1)!;
+    expect(action.statut).toBe("VALIDATION_REFUSEE");
+    await rouvrirAction(action,superviseur);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    action=donnees.actions.find(a=>a.id===1)!;
+    expect(action.statut).toBe("EN_COURS");
+    await declarerProgression(action,"Correction effectuée",utilisateur,true);
+    donnees=await chargerDonneesOperationnelles("progression",utilisateur);
+    expect(donnees.actions.find(a=>a.id===1)).toMatchObject({statut:"EN_ATTENTE_VALIDATION",commentaireRecruteur:"Correction effectuée"});
+  });
+
   it("conserve le cycle 9001 archivé lorsque le cycle 9002 est validé", async () => {
     installerModeDemo();
     const stockage=sessionStorage as unknown as {getItem:(k:string)=>string|null,setItem:(k:string,v:string)=>void};
