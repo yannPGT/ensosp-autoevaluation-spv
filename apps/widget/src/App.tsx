@@ -3,7 +3,6 @@ import { chargerTableauDeBord, LignePilotage, PersonnelTableauDeBord, SyntheseAx
 import { Niveau } from "./evaluation-data.js";
 import { chargerSessionEvaluation, creerEvaluation, enregistrerReponse, validerEvaluation } from "./evaluation-store.js";
 import { indicateursQuestionnaire, questionnaireHistorique, QuestionnaireDefinition } from "./questionnaire-data.js";
-import { utilisateurPrototype } from "./portal-data.js";
 import { compterReponsesNonEnregistrees, messageEchecSauvegarde } from "./questionnaire-state.js";
 import { chargerUtilisateurCourant } from "./grist-context.js";
 import { ModuleUtilisateurs } from "./UsersModule.js";
@@ -21,6 +20,7 @@ import {
   libellesRoles,
   menuPour,
   UtilisateurCourant,
+  utilisateurPrototype,
 } from "./portal-data.js";
 
 type EtapeEvaluation = "QUESTIONNAIRE" | "FINALISEE" | "BILAN";
