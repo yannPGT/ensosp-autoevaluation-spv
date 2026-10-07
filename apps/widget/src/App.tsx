@@ -459,6 +459,7 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   const [sessionChargee, setSessionChargee] = useState(false);
   const [avertissementFinalisation, setAvertissementFinalisation] = useState("");
   const [operationEvaluation, setOperationEvaluation] = useState(false);
+  const [indexIndicateur, setIndexIndicateur] = useState(0);
   const creationEnCours = useRef<Promise<number> | null>(null);
   const derniereSauvegarde = useRef<Promise<void>>(Promise.resolve());
 
@@ -488,6 +489,14 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
   }, [utilisateur, setReponses, setEtape]);
 
   const indicateurs = questionnaire ? indicateursQuestionnaire(questionnaire) : [];
+  const indicateurCourant = indicateurs[indexIndicateur];
+  const axeCourant = questionnaire?.axes.find((axe) => axe.indicateurs.some((indicateur) => indicateur.code === indicateurCourant?.code));
+
+  useEffect(() => {
+    if (!sessionChargee || !indicateurs.length) return;
+    const premierNonRenseigne = indicateurs.findIndex((indicateur) => !reponsesSauvegardees[indicateur.code]);
+    setIndexIndicateur(premierNonRenseigne >= 0 ? premierNonRenseigne : Math.max(0, indicateurs.length - 1));
+  }, [sessionChargee, questionnaire]);
 
   const reponsesNonEnregistrees = sessionChargee && Object.entries(reponses)
     .some(([code, niveau]) => reponsesSauvegardees[code] !== niveau);
@@ -633,24 +642,27 @@ function Questionnaire({ utilisateur, reponses, setReponses, etape, setEtape }: 
         <p className="progression" aria-live="polite"><strong>{nombreReponses}</strong> / {indicateurs.length}<span>réponses enregistrées</span></p>
       </div>
       <form onSubmit={valider}>
-        {questionnaire.axes.map((axe, axeIndex) => (
-          <section className="axe" aria-labelledby={`titre-${axe.code}`} key={axe.code}>
-            <div className="axe-titre"><span>Axe {axeIndex + 1}</span><h3 id={`titre-${axe.code}`}>{axe.titre}</h3></div>
-            {axe.indicateurs.map((indicateur) => (
-              <fieldset key={indicateur.code}>
-                <legend>{indicateur.titre}</legend>
-                <div className="choix-niveaux">
-                  {indicateur.options.map((option) => (
-                    <label className={reponses[indicateur.code] === option.niveau ? "choix-niveau choix-selectionne" : "choix-niveau"} key={option.niveau}>
-                      <input type="radio" name={indicateur.code} value={option.niveau} checked={reponses[indicateur.code] === option.niveau} onChange={() => choisirReponse(indicateur.code, option.niveau)} />
-                      <span>{option.criteres.join(" · ")}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ))}
+        {indicateurCourant && axeCourant && (
+          <section className="axe questionnaire-etape" aria-labelledby={`titre-${axeCourant.code}`}>
+            <div className="axe-titre"><span>Indicateur {indexIndicateur + 1} sur {indicateurs.length}</span><h3 id={`titre-${axeCourant.code}`}>{axeCourant.titre}</h3></div>
+            <fieldset>
+              <legend>{indicateurCourant.titre}</legend>
+              <div className="choix-niveaux">
+                {indicateurCourant.options.map((option) => (
+                  <label className={reponses[indicateurCourant.code] === option.niveau ? "choix-niveau choix-selectionne" : "choix-niveau"} key={option.niveau}>
+                    <input type="radio" name={indicateurCourant.code} value={option.niveau} checked={reponses[indicateurCourant.code] === option.niveau} onChange={() => choisirReponse(indicateurCourant.code, option.niveau)} />
+                    <span>{option.criteres.join(" · ")}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div className="navigation-questionnaire">
+              <button type="button" className="bouton-secondaire" onClick={() => setIndexIndicateur((index) => Math.max(0, index - 1))} disabled={indexIndicateur === 0}>Précédent</button>
+              <span>{indexIndicateur + 1} / {indicateurs.length}</span>
+              <button type="button" onClick={() => setIndexIndicateur((index) => Math.min(indicateurs.length - 1, index + 1))} disabled={indexIndicateur === indicateurs.length - 1}>Suivant</button>
+            </div>
           </section>
-        ))}
+        )}
         <div className="actions-formulaire">
           <button type="button" className="bouton-secondaire" onClick={enregistrerBrouillon} disabled={operationEvaluation}>Enregistrer le brouillon</button>
           <button type="submit" disabled={!complet || operationEvaluation}>Valider mon auto-évaluation</button>
