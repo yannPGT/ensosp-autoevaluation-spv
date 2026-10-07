@@ -28,9 +28,14 @@ export function ficheDeclenchee(
   return false;
 }
 
+const CLE_DEMO_EVALUATION = "spv-demo-evaluation-v1";
+interface EvaluationDemo { evaluationId:number|null; reponses:Record<string,Niveau>; statut:StatutSessionEvaluation; verrouillee:boolean; }
+function lireEvaluationDemo():EvaluationDemo { try { const brut=sessionStorage.getItem(CLE_DEMO_EVALUATION); if(brut)return JSON.parse(brut) as EvaluationDemo; } catch {} return {evaluationId:null,reponses:{},statut:null,verrouillee:false}; }
+function ecrireEvaluationDemo(etat:EvaluationDemo):void { try { sessionStorage.setItem(CLE_DEMO_EVALUATION,JSON.stringify(etat)); } catch {} }
+
 export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant): Promise<SessionEvaluation> {
   const api = obtenirDocApiGrist();
-  if (!api) return { evaluationId: null, reponses: {}, statut: null, verrouillee: false, questionnaire: questionnaireHistorique() };
+  if (!api) { const d=lireEvaluationDemo(); return { ...d, questionnaire: questionnaireHistorique() }; }
 
   const [evaluations, reponses, indicateurs, utilisateurs, axes, criteres] = await Promise.all([
     api.fetchTable("Evaluations"),
@@ -96,6 +101,7 @@ export async function chargerSessionEvaluation(utilisateur: UtilisateurCourant):
 }
 
 export async function creerEvaluation(utilisateur: UtilisateurCourant): Promise<number> {
+  if(!obtenirDocApiGrist()){const d=lireEvaluationDemo();if(d.evaluationId&&d.statut==="BROUILLON")return d.evaluationId;const id=9001;ecrireEvaluationDemo({evaluationId:id,reponses:{},statut:"BROUILLON",verrouillee:false});return id;}
   const api = exigerApi();
   const [utilisateurs, campagnes, evaluationsExistantes, axes, indicateurs, criteres] = await Promise.all([
     api.fetchTable("Utilisateurs"),
@@ -165,6 +171,7 @@ export async function creerEvaluation(utilisateur: UtilisateurCourant): Promise<
 }
 
 export async function enregistrerReponse(evaluationId: number, code: string, niveau: Niveau): Promise<void> {
+  if(!obtenirDocApiGrist()){const d=lireEvaluationDemo();if(d.evaluationId!==evaluationId||d.statut!=="BROUILLON")throw new Error("Cette évaluation n’est plus modifiable.");ecrireEvaluationDemo({...d,reponses:{...d.reponses,[code]:niveau}});return;}
   const api = exigerApi();
   const [evaluations, indicateurs, reponses] = await Promise.all([
     api.fetchTable("Evaluations"),
@@ -203,6 +210,7 @@ export async function enregistrerReponse(evaluationId: number, code: string, niv
 }
 
 export async function validerEvaluation(evaluationId: number, utilisateur: UtilisateurCourant): Promise<ResultatValidation> {
+  if(!obtenirDocApiGrist()){const d=lireEvaluationDemo();if(d.evaluationId!==evaluationId)throw new Error("Cette évaluation est introuvable.");const attendus=indicateursQuestionnaire(questionnaireHistorique());if(attendus.some(i=>!d.reponses[i.code]))throw new Error("Tous les indicateurs obligatoires doivent être renseignés.");ecrireEvaluationDemo({...d,statut:"VALIDEE",verrouillee:true});return {avertissement:null,generation:"COMPLETE"};}
   const api = exigerApi();
   const [evaluations, reponses, indicateurs, axes, criteres] = await Promise.all([
     api.fetchTable("Evaluations"),
