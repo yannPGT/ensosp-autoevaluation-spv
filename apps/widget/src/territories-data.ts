@@ -177,15 +177,15 @@ function enregistrerPerimetreDemo(s:SaisiePerimetre){const e=lireTerritoiresDemo
 function donneesDemonstration(): DonneesTerritoires {
   const d=lireTerritoiresDemo();
   const baseEntites:SaisieEntite[]=[{id:1,code:"ENSOSPP",nom:"ENSOSPP",parentId:0,actif:true},{id:2,code:"SIS_33",nom:"SDIS de la Gironde",parentId:1,actif:true}];
-  const basePerimetres:SaisiePerimetre[]=[{id:11,code:"PER_33_GLOBAL",nom:"SDIS 33 global",entiteId:2,actif:true},{id:12,code:"PER_33_NORD",nom:"Groupement Nord",entiteId:2,actif:true}];
-  const re=new Map(d.entites.filter(x=>x.id&&x.id<=2).map(x=>[x.id!,x])),rp=new Map(d.perimetres.filter(x=>x.id&&x.id<=12).map(x=>[x.id!,x]));
+  const basePerimetres:SaisiePerimetre[]=[{id:1,code:"PER_NATIONAL",nom:"Périmètre national",entiteId:1,actif:true},{id:2,code:"PER_33_NORD",nom:"SDIS 33 groupement NORD",entiteId:2,actif:true}];
+  const re=new Map(d.entites.filter(x=>x.id&&x.id<=2).map(x=>[x.id!,x])),rp=new Map(d.perimetres.filter(x=>x.id&&x.id<=2).map(x=>[x.id!,x]));
   const entites=baseEntites.map(x=>re.get(x.id!)??x).concat(d.entites.filter(x=>(x.id??0)>2));
-  const perimetres=basePerimetres.map(x=>rp.get(x.id!)??x).concat(d.perimetres.filter(x=>(x.id??0)>12));
+  const perimetres=basePerimetres.map(x=>rp.get(x.id!)??x).concat(d.perimetres.filter(x=>(x.id??0)>2));
   return construireDonneesTerritoires({
     id:entites.map(x=>x.id!),Code:entites.map(x=>normaliserCode(x.code)),Nom:entites.map(x=>x.nom),Parent:entites.map(x=>x.parentId||null),Actif:entites.map(x=>x.actif),
   }, {
     id:perimetres.map(x=>x.id!),Code:perimetres.map(x=>normaliserCode(x.code)),Nom:perimetres.map(x=>x.nom),Entite:perimetres.map(x=>x.entiteId),Actif:perimetres.map(x=>x.actif),
-  }, {id:[7],Entite:[2],PerimetrePrincipal:[12],Actif:[true]}, {id:[4],Perimetre:[12],Actif:[true]});
+  }, {id:[1,2,3],Entite:[1,2,2],PerimetrePrincipal:[1,2,2],Actif:[true,true,true]}, {id:[20],Perimetre:[2],Actif:[true]});
 }
 
 function normaliserCode(valeur: string): string { return valeur.trim().toLocaleUpperCase("fr").replace(/[\s-]+/g, "_"); }
