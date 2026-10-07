@@ -77,7 +77,7 @@ export function ModuleOperationnel({ page, utilisateur }: { page: string; utilis
   );
 }
 
-function Vue({ page, d, utilisateur, notifier, recharger }: {
+function Vue({ page, d, utilisateur, notifier, recharger, modeDemo }: {
   page: string;
   d: DonneesOperationnelles;
   utilisateur: UtilisateurCourant;
@@ -113,7 +113,7 @@ function Resultats({ d, utilisateur }: { d: DonneesOperationnelles; utilisateur:
   );
 }
 
-function Progression({ actions, utilisateur, notifier, recharger }: {
+function Progression({ actions, utilisateur, notifier, recharger, modeDemo }: {
   actions: readonly ActionMetier[];
   utilisateur: UtilisateurCourant;
   notifier: (t: "succes" | "erreur", x: string) => void;
@@ -125,7 +125,7 @@ function Progression({ actions, utilisateur, notifier, recharger }: {
   return <><div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter la feuille de route en PDF</button></div><div className="liste-actions-progres">{actions.map((a) => <ActionRecruteur key={a.id} action={a} utilisateur={utilisateur} notifier={notifier} recharger={recharger} modeDemo={modeDemo} />)}</div></>;
 }
 
-function ActionRecruteur({ action: a, utilisateur, notifier, recharger }: {
+function ActionRecruteur({ action: a, utilisateur, notifier, recharger, modeDemo }: {
   action: ActionMetier;
   utilisateur: UtilisateurCourant;
   notifier: (t: "succes" | "erreur", x: string) => void;
