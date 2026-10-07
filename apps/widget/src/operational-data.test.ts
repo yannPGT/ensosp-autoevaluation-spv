@@ -284,6 +284,19 @@ describe("règles métier du mode démonstration", () => {
     await expect(declarerProgression(action,"",utilisateur,false)).rejects.toThrow(/prise en compte/);
   });
 
+  it("rattache une fiche publiée à une action en démonstration", async () => {
+    installerModeDemo();
+    const superviseur={...utilisateur,id:2,role:"SUPERVISEUR" as const};
+    await rattacherFicheManquante(2,1,superviseur);
+    const donnees=await chargerDonneesOperationnelles("progression",superviseur);
+    expect(donnees.actions.find(a=>a.id===2)?.ficheVersionId).toBe(1);
+  });
+
+  it("interdit au recruteur de rattacher une fiche en démonstration", async () => {
+    installerModeDemo();
+    await expect(rattacherFicheManquante(2,1,utilisateur)).rejects.toThrow(/superviseur|administrateur/i);
+  });
+
   it("interdit au recruteur de définir une échéance même en démonstration", async () => {
     installerModeDemo();
     const action={id:1,perimetreId:1} as Parameters<typeof definirEcheance>[0];
