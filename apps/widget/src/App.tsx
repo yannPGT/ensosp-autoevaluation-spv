@@ -171,7 +171,7 @@ function Bandeau({ utilisateur, nomApplication }: { utilisateur: UtilisateurCour
         {utilisateur.role === "RECRUTEUR" && <span>Superviseur : {utilisateur.superviseurNom}</span>}
       </div>
       <p>Questionnaire administrable · vos données restent protégées par Grist</p>
-      <p className="version-widget">Version 1.0 · © YannPGT</p>
+      <p className="version-widget">Version 1.0</p>
     </header>
   );
 }
@@ -224,6 +224,10 @@ function Accueil({ utilisateur, menu, changerPage, etatTableau, rechargerTableau
           </button>
         ))}
       </div>
+      <footer className="signature-spm" aria-label="Crédit de développement">
+        <span>Développé par</span>
+        <img src="./spm-developpement.jpg" alt="SPM Développement" width="128" height="137" loading="lazy" />
+      </footer>
     </section>
   );
 }
