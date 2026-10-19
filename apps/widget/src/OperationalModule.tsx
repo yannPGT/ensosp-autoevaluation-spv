@@ -1,3 +1,4 @@
+import { EvaluationsRecruteurs } from "./RecruiterEvaluations.js";
 import React, { FormEvent, useEffect, useState } from "react";
 import { Niveau } from "./evaluation-data.js";
 import { UtilisateurCourant } from "./portal-data.js";
@@ -237,11 +238,8 @@ function Recruteurs({ d, utilisateur, notifier, recharger }: {
 }
 
 function Evaluations({ d, utilisateur }: { d: DonneesOperationnelles; utilisateur: UtilisateurCourant }) {
-  const [selection, setSelection] = useState(d.evaluations[0]?.id ?? 0);
-  const e = d.evaluations.find((x) => x.id === selection);
-  if (!d.evaluations.length) return <Vide texte="Aucune évaluation n’est visible dans vos périmètres." />;
   const exporter = () => telechargerTexte(`ensosp-suivi-${new Date().toISOString().slice(0, 10)}.csv`, suiviCsv(d.actions, utilisateur));
-  return <div className="corps-evaluations-superviseur"><div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter le suivi CSV</button></div><div className="liste-evaluations-superviseur">{d.evaluations.map((x) => <button className={selection === x.id ? "selectionnee" : ""} key={x.id} onClick={() => setSelection(x.id)}><strong>{x.recruteur}</strong><span>{x.statut} · {x.progression}%</span><small>{x.dateValidation !== "—" ? x.dateValidation : x.dateDebut}</small></button>)}</div>{e && <article className="detail-evaluation-superviseur"><h3>{e.recruteur}</h3><p>{e.perimetre} · {e.statut}</p>{e.reponses.map((r) => <div key={r.id}><span><code>{r.codeIndicateur}</code><strong>{r.indicateur}</strong></span><span className={`badge niveau-${r.niveau.toLowerCase()}`}>{r.niveau}</span></div>)}</article>}</div>;
+  return <><div className="actions-formulaire"><button type="button" onClick={exporter}>Exporter le suivi CSV</button></div><EvaluationsRecruteurs donnees={d} /></>;
 }
 
 function Validation({ actions, utilisateur, notifier, recharger }: { actions: readonly ActionMetier[]; utilisateur: UtilisateurCourant; notifier: (t: "succes" | "erreur", x: string) => void; recharger: () => void }) {

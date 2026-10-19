@@ -594,3 +594,24 @@ button:focus-visible, input:focus-visible { outline: 3px solid #2b70b9; outline-
 .signature-spm span { color:#52667d; font-size:.65rem; font-weight:400; line-height:1.4; }
 .signature-spm img { display:block; width:144px; height:auto; max-width:45vw; flex-shrink:0; }
 @media (max-width:600px) { .signature-spm { margin-top:22px; padding-top:14px; gap:8px; } .signature-spm img { width:128px; } }
+.analyse-depliable>summary { cursor:pointer; font-weight:700; color:#0f2f55; padding:12px 0; }
+.analyse-depliable>summary:focus-visible { outline:2px solid #266fa7; outline-offset:4px; }
+.choix-recruteurs { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr)); gap:14px; }
+.choix-recruteurs>button { display:grid; gap:8px; text-align:left; padding:20px; background:#f7f9fc; color:#0f2f55; border:1px solid #d4deea; border-radius:12px; }
+.choix-recruteurs>button:hover { background:#eaf1f8; border-color:#266fa7; }
+.choix-recruteurs small { font-weight:400; }
+.fiche-evolution-recruteur { min-width:0; }
+.graphique-evolution { padding:20px; margin:18px 0 28px; border:1px solid #d4deea; border-radius:12px; background:#fff; }
+.graphique-evolution>p { color:#52667d; font-size:.85rem; line-height:1.5; }
+.legende-evolution { display:flex; flex-wrap:wrap; gap:8px 22px; padding:0; list-style:none; font-size:.75rem; color:#0f2f55; }
+.groupes-evolution { display:grid; gap:18px; margin-top:24px; }
+.groupes-evolution article { border-top:1px solid #e5e8ec; padding-top:12px; }
+.groupes-evolution h4 { margin:0 0 10px; font-size:.85rem; }
+.groupes-evolution code { color:#52667d; margin-right:8px; }
+.ligne-evolution { display:grid; grid-template-columns:36px minmax(0,1fr) 110px; gap:10px; align-items:center; margin:7px 0; font-size:.7rem; }
+.ligne-evolution>strong { color:#33465b; }
+.piste-evolution { height:18px; background:repeating-linear-gradient(to right,#f1f4f8 0, #f1f4f8 calc(33.333% - 1px),#d4deea calc(33.333% - 1px),#d4deea 33.333%); border-radius:3px; }
+.barre-evolution { height:100%; display:block; border-radius:3px; }
+.barre-rouge { background:#b4202a; }.barre-orange { background:#c77d16; }.barre-vert { background:#24704b; }
+.fiche-evolution-recruteur .detail-evaluation-superviseur { margin-top:18px; }
+@media(max-width:600px) { .graphique-evolution { padding:12px; }.ligne-evolution { grid-template-columns:28px minmax(0,1fr) 90px; gap:6px; } }
