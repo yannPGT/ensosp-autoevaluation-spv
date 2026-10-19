@@ -225,8 +225,8 @@ function Accueil({ utilisateur, menu, changerPage, etatTableau, rechargerTableau
         ))}
       </div>
       <footer className="signature-spm" aria-label="Crédit de développement">
-        <span>Développé par</span>
-        <img src="./spm-developpement.jpg" alt="SPM Développement" width="128" height="137" loading="lazy" />
+        <span>Développement</span>
+        <img src="./spm-developpement-horizontal.png" alt="SPM Développement" width="144" height="48" loading="lazy" />
       </footer>
     </section>
   );
