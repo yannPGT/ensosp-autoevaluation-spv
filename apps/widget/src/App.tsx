@@ -171,7 +171,7 @@ function Bandeau({ utilisateur, nomApplication }: { utilisateur: UtilisateurCour
         {utilisateur.role === "RECRUTEUR" && <span>Superviseur : {utilisateur.superviseurNom}</span>}
       </div>
       <p>Questionnaire administrable · vos données restent protégées par Grist</p>
-      <p className="version-widget">Version 1.0</p>
+      <p className="version-widget">Version 1.1</p>
     </header>
   );
 }

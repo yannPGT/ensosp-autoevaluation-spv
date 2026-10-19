@@ -1,7 +1,7 @@
 {
   "name": "ensosp-autoevaluation-spv",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.1.0",
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
